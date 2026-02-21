@@ -79,3 +79,83 @@ Optional flags:
 
 - This is a **question-level** pipeline optimized first for **next-step correctness prediction**.
 - Outputs are versioned under `dkt_qlevel_v1` to keep experiments reproducible.
+
+## LSTM DKT training and evaluation
+
+### 1) Create a virtual environment and install dependencies
+
+From `model-training/`:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements.txt
+```
+
+### 2) Train on a single fold
+
+```bash
+python3 -m src.modeling.train_dkt_lstm \
+  --data-dir data/processed/dkt_qlevel_v1 \
+  --output-dir artifacts/dkt_lstm \
+  --run-name single_fold_experiment \
+  --fold 0 \
+  --device mps
+```
+
+### 3) Train across all folds (cross-validation)
+
+```bash
+python3 -m src.modeling.train_dkt_lstm \
+  --data-dir data/processed/dkt_qlevel_v1 \
+  --output-dir artifacts/dkt_lstm \
+  --run-name cv_experiment \
+  --all-folds \
+  --device mps
+```
+
+### 4) Evaluation-only mode (AUC)
+
+Single fold with explicit checkpoint:
+
+```bash
+python3 -m src.modeling.train_dkt_lstm \
+  --data-dir data/processed/dkt_qlevel_v1 \
+  --output-dir artifacts/dkt_lstm \
+  --run-name eval_single_fold \
+  --fold 0 \
+  --eval-only \
+  --device mps \
+  --checkpoint artifacts/dkt_lstm/single_fold_experiment/fold_0/best_model.pt
+```
+
+All folds using a checkpoint root (expects `fold_*/best_model.pt` under the root):
+
+```bash
+python3 -m src.modeling.train_dkt_lstm \
+  --data-dir data/processed/dkt_qlevel_v1 \
+  --output-dir artifacts/dkt_lstm \
+  --run-name eval_all_folds \
+  --all-folds \
+  --eval-only \
+  --device mps \
+  --checkpoint-root artifacts/dkt_lstm/cv_experiment
+```
+
+If you prefer auto device selection, omit `--device`; the script now picks `cuda`, then `mps`, then `cpu`.
+
+### 5) Outputs produced by the DKT script
+
+Per fold:
+
+- `best_model.pt`
+- `metrics.json` (for training runs) or `<split>_eval_metrics.json` (for eval-only runs)
+- `loss_curve.png` (training)
+- `auc_curve.png` (training)
+- `roc_curve.png` (training) or `<split>_roc_curve.png` (eval-only)
+- `prediction_histogram.png` (training) or `<split>_prediction_histogram.png` (eval-only)
+
+Per run:
+
+- `cv_summary.json` with fold metrics and mean/std AUC.

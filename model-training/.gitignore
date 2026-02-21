@@ -5,7 +5,14 @@ XES3G5M/
 data/interim/
 data/processed/
 data/reports/
+artifacts/
 
 # Python cache/bytecode
 __pycache__/
 *.pyc
+
+# Local virtual environment
+.venv/
+
+# Local plotting/font cache
+.cache/
