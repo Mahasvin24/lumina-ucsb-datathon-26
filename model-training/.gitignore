@@ -1,1 +1,11 @@
+# Raw dataset dump
 XES3G5M/
+
+# Generated pipeline artifacts
+data/interim/
+data/processed/
+data/reports/
+
+# Python cache/bytecode
+__pycache__/
+*.pyc
