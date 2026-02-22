@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { MatrixView } from "@/components/dashboard/matrix-view";
 import { QuestionsTable } from "@/components/dashboard/questions-table";
@@ -11,11 +11,8 @@ import { ScoreDistribution } from "@/components/dashboard/score-distribution";
 import { StudentsTable } from "@/components/dashboard/students-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
-import {
-  ConceptAccuracy,
-  DashboardPayload,
-  ProcessSelectedQuestionsResponse,
-} from "@/lib/dashboard-api";
+import { ConceptAccuracy, DashboardPayload } from "@/lib/dashboard-api";
+import { getPersistedDashboardState, setPersistedDashboardState } from "@/lib/dashboard-storage";
 import { useProcessedData } from "@/lib/processed-data-context";
 
 type DashboardClientProps = {
@@ -50,15 +47,23 @@ function clampProbability(value: number): number {
 }
 
 export function DashboardClient({ data }: DashboardClientProps) {
-  const { setProcessedData } = useProcessedData();
-  const [processedResult, setProcessedResult] = useState<ProcessSelectedQuestionsResponse | null>(null);
-  const [testedQuestionIds, setTestedQuestionIds] = useState<number[]>([]);
+  const { processedResult, testedQuestionIds, setProcessedData } = useProcessedData();
   const [studentThresholdPct, setStudentThresholdPct] = useState<number>(
     data.settings.studentThresholdPct,
   );
   const [questionThresholdPct, setQuestionThresholdPct] = useState<number>(
     data.settings.questionThresholdPct,
   );
+
+  useEffect(() => {
+    const stored = getPersistedDashboardState();
+    if (stored?.studentThresholdPct !== undefined) {
+      setStudentThresholdPct(stored.studentThresholdPct);
+    }
+    if (stored?.questionThresholdPct !== undefined) {
+      setQuestionThresholdPct(stored.questionThresholdPct);
+    }
+  }, []);
   const testedQuestionIdSet = useMemo(() => new Set(testedQuestionIds), [testedQuestionIds]);
   const probabilitiesByStudent = useMemo(() => {
     const probabilities = new Map<number, Map<number, number>>();
@@ -347,9 +352,12 @@ export function DashboardClient({ data }: DashboardClientProps) {
                 const next = Number(event.target.value);
                 if (Number.isNaN(next)) {
                   setQuestionThresholdPct(0);
+                  setPersistedDashboardState({ questionThresholdPct: 0 });
                   return;
                 }
-                setQuestionThresholdPct(Math.min(100, Math.max(0, next)));
+                const value = Math.min(100, Math.max(0, next));
+                setQuestionThresholdPct(value);
+                setPersistedDashboardState({ questionThresholdPct: value });
               }}
               className="w-16 rounded-md border border-zinc-200 bg-white px-2 py-1 text-right text-sm text-zinc-900"
               aria-label="Question threshold percent"
@@ -360,11 +368,8 @@ export function DashboardClient({ data }: DashboardClientProps) {
       >
         <QuestionsTable
           questions={displayedQuestions}
-          onProcessedSelection={(questionIds, result) => {
-            setTestedQuestionIds(questionIds);
-            setProcessedResult(result);
-            setProcessedData(questionIds, result);
-          }}
+          initialTestedQuestionIds={testedQuestionIds}
+          onProcessedSelection={setProcessedData}
         />
       </SectionCard>
 
@@ -410,9 +415,12 @@ export function DashboardClient({ data }: DashboardClientProps) {
                 const next = Number(event.target.value);
                 if (Number.isNaN(next)) {
                   setStudentThresholdPct(0);
+                  setPersistedDashboardState({ studentThresholdPct: 0 });
                   return;
                 }
-                setStudentThresholdPct(Math.min(100, Math.max(0, next)));
+                const value = Math.min(100, Math.max(0, next));
+                setStudentThresholdPct(value);
+                setPersistedDashboardState({ studentThresholdPct: value });
               }}
               className="w-16 rounded-md border border-zinc-200 bg-white px-2 py-1 text-right text-sm text-zinc-900"
               aria-label="Student threshold percent"

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ProcessSelectedQuestionsResponse,
   QuestionRow,
   processSelectedQuestions,
 } from "@/lib/dashboard-api";
+import { useProcessedData } from "@/lib/processed-data-context";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,22 +23,45 @@ import {
 
 type QuestionsTableProps = {
   questions: QuestionRow[];
+  initialTestedQuestionIds?: number[];
   onProcessedSelection?: (questionIds: number[], result: ProcessSelectedQuestionsResponse) => void;
 };
 
 export function QuestionsTable({
   questions,
+  initialTestedQuestionIds,
   onProcessedSelection,
 }: QuestionsTableProps) {
+  const { clearProcessedData } = useProcessedData();
   const defaultSelected = useMemo(
     () => new Set(questions.map((question) => question.questionId)),
     [questions],
   );
-  const [selected, setSelected] = useState<Set<number>>(defaultSelected);
+  const initialSelected = useMemo(() => {
+    if (initialTestedQuestionIds?.length) {
+      return new Set(initialTestedQuestionIds);
+    }
+    return defaultSelected;
+  }, [defaultSelected, initialTestedQuestionIds]);
+  const [selected, setSelected] = useState<Set<number>>(initialSelected);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProcessSelectedQuestionsResponse | null>(null);
-  const [testedQuestionIds, setTestedQuestionIds] = useState<Set<number>>(new Set());
+  const initialTestedSet = useMemo(
+    () => (initialTestedQuestionIds?.length ? new Set(initialTestedQuestionIds) : new Set<number>()),
+    [initialTestedQuestionIds],
+  );
+  const [testedQuestionIds, setTestedQuestionIds] = useState<Set<number>>(initialTestedSet);
+
+  useEffect(() => {
+    if (initialTestedQuestionIds?.length) {
+      setSelected(new Set(initialTestedQuestionIds));
+      setTestedQuestionIds(new Set(initialTestedQuestionIds));
+    } else if (Array.isArray(initialTestedQuestionIds) && initialTestedQuestionIds.length === 0) {
+      setResult(null);
+      setTestedQuestionIds(new Set());
+    }
+  }, [initialTestedQuestionIds]);
 
   const toggle = (questionId: number) => {
     setSelected((prev) => {
@@ -81,13 +105,23 @@ export function QuestionsTable({
         <p className="text-sm text-zinc-600">
           Select questions to test student knowledge.
         </p>
-        <Button
-          type="button"
-          onClick={processCheckedQuestions}
-          disabled={isProcessing}
-        >
-          {isProcessing ? "Processing..." : "Process selected questions"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={processCheckedQuestions}
+            disabled={isProcessing}
+          >
+            {isProcessing ? "Processing..." : "Process Questions"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={clearProcessedData}
+            disabled={isProcessing}
+          >
+            Reset
+          </Button>
+        </div>
       </div>
 
       {error ? (
