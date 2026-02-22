@@ -7,6 +7,18 @@ import {
   QuestionRow,
   processSelectedQuestions,
 } from "@/lib/dashboard-api";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type QuestionsTableProps = {
   questions: QuestionRow[];
@@ -66,77 +78,76 @@ export function QuestionsTable({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+        <p className="text-sm text-zinc-600">
           Checked questions are sent to backend for all discovered students.
         </p>
-        <button
+        <Button
           type="button"
           onClick={processCheckedQuestions}
           disabled={isProcessing}
-          className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-zinc-400"
         >
           {isProcessing ? "Processing..." : "Process selected questions"}
-        </button>
+        </Button>
       </div>
 
       {error ? (
-        <p className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
 
       {result ? (
-        <p className="text-sm text-emerald-700 dark:text-emerald-300">
+        <Alert variant="success">
+          <AlertDescription>
           {result.errors && result.errors.length > 0
             ? `Processed with partial errors: ${result.students.length} students succeeded, ${result.errors.length} failed.`
             : `Success: processed ${result.students.length} students.`}
-        </p>
+          </AlertDescription>
+        </Alert>
       ) : null}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-zinc-200 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-              <th className="px-2 py-2 font-medium">Process</th>
-              <th className="px-2 py-2 font-medium">Question</th>
-              <th className="px-2 py-2 font-medium">Class % Correct</th>
-              <th className="px-2 py-2 font-medium">Correct / Attempts</th>
-              <th className="px-2 py-2 font-medium">Skill Tags</th>
-              <th className="px-2 py-2 font-medium">Flag</th>
-            </tr>
-          </thead>
-          <tbody>
+      <Table className="min-w-full text-left">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Process</TableHead>
+            <TableHead>Question</TableHead>
+            <TableHead>Class % Correct</TableHead>
+            <TableHead>Correct / Attempts</TableHead>
+            <TableHead>Skill Tags</TableHead>
+            <TableHead>Flag</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
             {questions.map((question) => (
-              <tr
-                key={question.questionId}
-                className="border-b border-zinc-100 text-zinc-800 dark:border-zinc-900 dark:text-zinc-200"
-              >
-                <td className="px-2 py-2">
-                  <input
-                    type="checkbox"
+              <TableRow key={question.questionId}>
+                <TableCell>
+                  <Checkbox
                     checked={selected.has(question.questionId)}
-                    onChange={() => toggle(question.questionId)}
+                    onCheckedChange={() => toggle(question.questionId)}
                     aria-label={`Process question ${question.questionId}`}
                   />
-                </td>
-                <td className="px-2 py-2">Q{question.questionId}</td>
-                <td className="px-2 py-2">{question.classCorrectPct.toFixed(2)}%</td>
-                <td className="px-2 py-2">
+                </TableCell>
+                <TableCell>Q{question.questionId}</TableCell>
+                <TableCell>{question.classCorrectPct.toFixed(2)}%</TableCell>
+                <TableCell>
                   {question.correctCount} / {question.attempts}
-                </td>
-                <td className="px-2 py-2">
+                </TableCell>
+                <TableCell>
                   {question.skillTags.length > 0
                     ? question.skillTags.join(", ")
                     : "None"}
-                </td>
-                <td className="px-2 py-2">
-                  {question.classCorrectPct < questionThresholdPct ? "Flagged" : "OK"}
-                </td>
-              </tr>
+                </TableCell>
+                <TableCell>
+                  {question.classCorrectPct < questionThresholdPct ? (
+                    <Badge variant="destructive">Flagged</Badge>
+                  ) : (
+                    <Badge variant="success">OK</Badge>
+                  )}
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+        </TableBody>
+      </Table>
 
     </div>
   );

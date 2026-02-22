@@ -1,4 +1,5 @@
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DashboardPayload, getDashboardData } from "@/lib/dashboard-api";
 
 export const metadata = {
@@ -8,14 +9,14 @@ export const metadata = {
 function DashboardErrorState({ message }: { message: string }) {
   return (
     <main className="mx-auto min-h-screen max-w-6xl p-6">
-      <div className="rounded-xl border border-rose-300 bg-rose-50 p-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-        <h1 className="text-xl font-semibold">Dashboard unavailable</h1>
-        <p className="mt-2 text-sm">{message}</p>
-        <p className="mt-2 text-sm">
+      <Alert variant="destructive" className="p-6">
+        <AlertTitle className="text-xl">Dashboard unavailable</AlertTitle>
+        <AlertDescription className="mt-2">{message}</AlertDescription>
+        <AlertDescription className="mt-2">
           Start the backend API and refresh this page. Expected endpoint:{" "}
           <code>/dashboard-data</code>
-        </p>
-      </div>
+        </AlertDescription>
+      </Alert>
     </main>
   );
 }
@@ -33,12 +34,10 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl space-y-6 bg-zinc-50 p-6 dark:bg-black">
+    <main className="mx-auto min-h-screen max-w-7xl space-y-6 bg-zinc-50 p-6">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold text-zinc-900 dark:text-zinc-100">
-          Test Set Summary
-        </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <h1 className="text-3xl font-semibold text-zinc-900">Test Set Summary</h1>
+        <p className="text-sm text-zinc-600">
           Real metrics from <code>students/student_*.csv</code> and{" "}
           <code>students/test_questions.csv</code>.
         </p>

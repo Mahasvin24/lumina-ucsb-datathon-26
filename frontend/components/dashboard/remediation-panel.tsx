@@ -1,4 +1,5 @@
 import { DashboardPayload } from "@/lib/dashboard-api";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
 
 type RemediationPanelProps = {
   data: DashboardPayload;
@@ -14,46 +15,56 @@ export function RemediationPanel({ data }: RemediationPanelProps) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        <Card className="bg-zinc-50 shadow-none">
+          <CardContent className="p-3">
+            <CardDescription className="text-xs uppercase tracking-wide">
             Include Rules
-          </p>
-          <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+            </CardDescription>
+            <p className="mt-2 text-sm text-zinc-700">
             Questions below {settings.questionThresholdPct.toFixed(0)}% class
             correct, questions missed by students below{" "}
             {settings.studentThresholdPct.toFixed(0)}%, and top{" "}
             {settings.topNHardest} hardest.
-          </p>
-        </div>
-        <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="bg-zinc-50 shadow-none">
+          <CardContent className="p-3">
+            <CardDescription className="text-xs uppercase tracking-wide">
             Student Group
-          </p>
-          <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+            </CardDescription>
+            <p className="mt-2 text-sm text-zinc-700">
             {flaggedNames.length > 0 ? flaggedNames.join(", ") : "No flagged students"}
-          </p>
-        </div>
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Questions selected</p>
-          <p className="text-xl font-semibold">{remediation.questionCount}</p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Estimated time</p>
-          <p className="text-xl font-semibold">
+        <Card className="shadow-none">
+          <CardContent className="p-3">
+            <CardDescription className="text-xs">Questions selected</CardDescription>
+            <p className="text-xl font-semibold">{remediation.questionCount}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-none">
+          <CardContent className="p-3">
+            <CardDescription className="text-xs">Estimated time</CardDescription>
+            <p className="text-xl font-semibold">
             {remediation.estimatedTimeMinutes} min
-          </p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Skill coverage</p>
-          <p className="text-sm font-medium">
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-none">
+          <CardContent className="p-3">
+            <CardDescription className="text-xs">Skill coverage</CardDescription>
+            <p className="text-sm font-medium">
             {remediation.skillCoverage.length > 0
               ? remediation.skillCoverage.join(", ")
               : "No concept tags"}
-          </p>
-        </div>
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -1,4 +1,12 @@
 import { StudentRow } from "@/lib/dashboard-api";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type StudentsTableProps = {
   students: StudentRow[];
@@ -6,36 +14,31 @@ type StudentsTableProps = {
 
 export function StudentsTable({ students }: StudentsTableProps) {
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-            <th className="px-2 py-2 font-medium">Student</th>
-            <th className="px-2 py-2 font-medium">Score</th>
-            <th className="px-2 py-2 font-medium">Correct / Total</th>
-            <th className="px-2 py-2 font-medium">Completion</th>
-            <th className="px-2 py-2 font-medium">Status</th>
-            <th className="px-2 py-2 font-medium">Most Missed Concept</th>
-          </tr>
-        </thead>
-        <tbody>
+    <Table className="min-w-full text-left">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Student</TableHead>
+          <TableHead>Score</TableHead>
+          <TableHead>Correct / Total</TableHead>
+          <TableHead>Completion</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Most Missed Concept</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
           {students.map((student) => (
-            <tr
-              key={student.studentId}
-              className="border-b border-zinc-100 text-zinc-800 dark:border-zinc-900 dark:text-zinc-200"
-            >
-              <td className="px-2 py-2">{student.name}</td>
-              <td className="px-2 py-2">{student.scorePct.toFixed(2)}%</td>
-              <td className="px-2 py-2">
+            <TableRow key={student.studentId}>
+              <TableCell>{student.name}</TableCell>
+              <TableCell>{student.scorePct.toFixed(2)}%</TableCell>
+              <TableCell>
                 {student.correctCount} / {student.totalQuestions}
-              </td>
-              <td className="px-2 py-2">{student.completionPct.toFixed(2)}%</td>
-              <td className="px-2 py-2">{student.status}</td>
-              <td className="px-2 py-2">{student.mostMissedConcept}</td>
-            </tr>
+              </TableCell>
+              <TableCell>{student.completionPct.toFixed(2)}%</TableCell>
+              <TableCell>{student.status}</TableCell>
+              <TableCell>{student.mostMissedConcept}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+      </TableBody>
+    </Table>
   );
 }

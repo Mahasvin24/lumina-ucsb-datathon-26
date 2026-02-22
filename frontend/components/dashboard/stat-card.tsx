@@ -1,3 +1,5 @@
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
+
 type StatCardProps = {
   label: string;
   value: string;
@@ -5,13 +7,11 @@ type StatCardProps = {
 
 export function StatCard({ label, value }: StatCardProps) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-        {value}
-      </p>
-    </div>
+    <Card className="bg-zinc-50">
+      <CardContent className="p-4">
+        <CardDescription className="text-xs uppercase tracking-wide">{label}</CardDescription>
+        <p className="mt-2 text-2xl font-semibold text-zinc-900">{value}</p>
+      </CardContent>
+    </Card>
   );
 }
