@@ -144,9 +144,18 @@ export function DashboardClient({ data }: DashboardClientProps) {
     };
   }, [data.matrix, processedResult, probabilitiesByStudent, testedQuestionIdSet]);
 
+  const skillTagsByQuestion = useMemo(() => {
+    const lookup = new Map<number, string[]>();
+    for (const q of data.questions) {
+      lookup.set(q.questionId, q.skillTags);
+    }
+    return lookup;
+  }, [data.questions]);
+
   const displayedStudents = useMemo(() => {
+    const processedCount = testedQuestionIds.length;
+
     return data.students.map((student) => {
-      const total = displayedMatrix.questionIds.length;
       const matrixRow = displayedMatrix.rows.find((row) => row.studentId === student.studentId);
       const cells = matrixRow?.cells || [];
 
@@ -162,6 +171,34 @@ export function DashboardClient({ data }: DashboardClientProps) {
       const answered = cells.filter(
         (cell) => cell.probability !== undefined || cell.state !== "unanswered",
       ).length;
+      const total = processedCount > 0 ? processedCount : displayedMatrix.questionIds.length;
+
+      const conceptProbSum = new Map<string, number>();
+      const conceptProbCount = new Map<string, number>();
+      for (const cell of cells) {
+        if (cell.probability === undefined) continue;
+        const tags = skillTagsByQuestion.get(cell.questionId) ?? [];
+        for (const tag of tags) {
+          conceptProbSum.set(tag, (conceptProbSum.get(tag) ?? 0) + cell.probability);
+          conceptProbCount.set(tag, (conceptProbCount.get(tag) ?? 0) + 1);
+        }
+      }
+
+      const areasToStudy: string[] = [];
+      if (conceptProbCount.size > 0) {
+        const conceptAvg: { tag: string; avg: number }[] = [];
+        for (const [tag, count] of conceptProbCount) {
+          const avg = (conceptProbSum.get(tag) ?? 0) / count;
+          if (avg < 0.9) {
+            conceptAvg.push({ tag, avg });
+          }
+        }
+        conceptAvg.sort((a, b) => a.avg - b.avg);
+        for (const entry of conceptAvg.slice(0, 3)) {
+          areasToStudy.push(entry.tag);
+        }
+      }
+
       return {
         ...student,
         totalQuestions: total,
@@ -170,9 +207,10 @@ export function DashboardClient({ data }: DashboardClientProps) {
         scorePct: Number(pct(expectedCorrect, total).toFixed(2)),
         completionPct: Number(pct(answered, total).toFixed(2)),
         status: answered === total ? ("Complete" as const) : ("Incomplete" as const),
+        areasToStudy,
       };
     });
-  }, [data.students, displayedMatrix]);
+  }, [data.students, displayedMatrix, skillTagsByQuestion, testedQuestionIds]);
 
   const displayedSummary = useMemo(() => {
     const scores = displayedStudents.map((student) => student.scorePct);
@@ -209,10 +247,27 @@ export function DashboardClient({ data }: DashboardClientProps) {
   }, [displayedStudents, displayedQuestions, studentThresholdPct, testedQuestionIds.length]);
 
   const mostMissedConcepts: ConceptAccuracy[] = useMemo(() => {
-    return data.conceptAccuracy
-      .filter((c) => c.correctPct < questionThresholdPct)
-      .slice(0, 5);
-  }, [data.conceptAccuracy, questionThresholdPct]);
+    const conceptCorrect = new Map<string, number>();
+    const conceptTotal = new Map<string, number>();
+
+    for (const question of displayedQuestions) {
+      for (const tag of question.skillTags) {
+        conceptCorrect.set(tag, (conceptCorrect.get(tag) ?? 0) + question.correctCount);
+        conceptTotal.set(tag, (conceptTotal.get(tag) ?? 0) + question.attempts);
+      }
+    }
+
+    const concepts: ConceptAccuracy[] = [];
+    for (const [tag, total] of conceptTotal) {
+      if (total > 0) {
+        const correct = conceptCorrect.get(tag) ?? 0;
+        concepts.push({ tag, correctPct: Number(((correct / total) * 100).toFixed(2)) });
+      }
+    }
+
+    concepts.sort((a, b) => a.correctPct - b.correctPct);
+    return concepts.filter((c) => c.correctPct < questionThresholdPct).slice(0, 5);
+  }, [displayedQuestions, questionThresholdPct]);
 
   const belowThresholdValueClass =
     displayedSummary.studentsBelowThresholdPct <= 20
@@ -223,9 +278,9 @@ export function DashboardClient({ data }: DashboardClientProps) {
 
   return (
     <>
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_1.5fr_1.5fr_1fr]">
         <StatCard
-          label="Class average score"
+          label="Class average"
           value={`${displayedSummary.classAveragePct.toFixed(2)}%`}
         />
         <StatCard
@@ -245,11 +300,46 @@ export function DashboardClient({ data }: DashboardClientProps) {
           value={formatQuestionRef(displayedSummary.easiestQuestion)}
         />
         <StatCard
-          label="Students below threshold"
+          label="Below threshold"
           value={`${displayedSummary.studentsBelowThresholdPct.toFixed(2)}%`}
           valueClassName={belowThresholdValueClass}
         />
       </section>
+
+      <SectionCard
+        title="Question Analysis"
+        subtitle={
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-500">
+            Flag questions below
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={questionThresholdPct}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isNaN(next)) {
+                  setQuestionThresholdPct(0);
+                  return;
+                }
+                setQuestionThresholdPct(Math.min(100, Math.max(0, next)));
+              }}
+              className="w-16 rounded-md border border-zinc-200 bg-white px-2 py-1 text-right text-sm text-zinc-900"
+              aria-label="Question threshold percent"
+            />
+            % class correct
+          </label>
+        }
+      >
+        <QuestionsTable
+          questions={displayedQuestions}
+          onProcessedSelection={(questionIds, result) => {
+            setTestedQuestionIds(questionIds);
+            setProcessedResult(result);
+          }}
+        />
+      </SectionCard>
 
       {mostMissedConcepts.length > 0 && (
         <SectionCard
@@ -305,41 +395,6 @@ export function DashboardClient({ data }: DashboardClientProps) {
         }
       >
         <StudentsTable students={displayedStudents} />
-      </SectionCard>
-
-      <SectionCard
-        title="Question Analysis"
-        subtitle={
-          <label className="inline-flex items-center gap-2 text-sm text-zinc-500">
-            Flag questions below
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={questionThresholdPct}
-              onChange={(event) => {
-                const next = Number(event.target.value);
-                if (Number.isNaN(next)) {
-                  setQuestionThresholdPct(0);
-                  return;
-                }
-                setQuestionThresholdPct(Math.min(100, Math.max(0, next)));
-              }}
-              className="w-16 rounded-md border border-zinc-200 bg-white px-2 py-1 text-right text-sm text-zinc-900"
-              aria-label="Question threshold percent"
-            />
-            % class correct
-          </label>
-        }
-      >
-        <QuestionsTable
-          questions={displayedQuestions}
-          onProcessedSelection={(questionIds, result) => {
-            setTestedQuestionIds(questionIds);
-            setProcessedResult(result);
-          }}
-        />
       </SectionCard>
 
       <SectionCard title="Student x Question Matrix">

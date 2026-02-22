@@ -183,19 +183,12 @@ def build_dashboard_data(
         else:
             total_minutes = 0.0
 
-        concept_miss_counts: dict[str, int] = {}
         for qid, attempt in per_q.items():
             per_question_attempts[qid] += 1
             per_question_correct[qid] += attempt.response
             per_question_concepts[qid].update(attempt.concept_ids)
             if attempt.response == 0:
                 per_question_wrong_students[qid].append(student.student_id)
-                for concept in attempt.concept_ids:
-                    concept_miss_counts[concept] = concept_miss_counts.get(concept, 0) + 1
-
-        most_missed_concept = "None"
-        if concept_miss_counts:
-            most_missed_concept = get_tag_label(max(concept_miss_counts, key=concept_miss_counts.get))
 
         if score_pct < student_threshold:
             flagged_students.append(student.student_id)
@@ -214,7 +207,7 @@ def build_dashboard_data(
                 "status": status,
                 "timeSpentMinutes": total_minutes,
                 "medianSpacingMinutes": _median_time_minutes(attempts_sorted),
-                "mostMissedConcept": most_missed_concept,
+                "areasToStudy": [],
             }
         )
 

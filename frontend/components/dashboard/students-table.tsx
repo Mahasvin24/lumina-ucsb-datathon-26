@@ -1,4 +1,5 @@
 import { StudentRow } from "@/lib/dashboard-api";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -19,16 +20,26 @@ export function StudentsTable({ students }: StudentsTableProps) {
         <TableRow>
           <TableHead>Student</TableHead>
           <TableHead>Score</TableHead>
-          <TableHead className="w-[65%]">Most Missed Concept</TableHead>
+          <TableHead className="w-[65%]">Areas to Study Next</TableHead>
         </TableRow>
-      </TableHeader>
+      </TableHeader> 
       <TableBody>
           {students.map((student) => (
             <TableRow key={student.studentId}>
               <TableCell>{student.name}</TableCell>
               <TableCell>{student.scorePct.toFixed(2)}%</TableCell>
-              <TableCell className="max-w-0 whitespace-normal wrap-break-word">
-                {student.mostMissedConcept || "None"}
+              <TableCell>
+                {student.areasToStudy.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {student.areasToStudy.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-xs font-normal">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-zinc-400">—</span>
+                )}
               </TableCell>
             </TableRow>
           ))}

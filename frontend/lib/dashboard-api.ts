@@ -28,7 +28,7 @@ export type StudentRow = {
   status: "Complete" | "Incomplete";
   timeSpentMinutes: number;
   medianSpacingMinutes: number;
-  mostMissedConcept: string;
+  areasToStudy: string[];
 };
 
 export type QuestionRow = {

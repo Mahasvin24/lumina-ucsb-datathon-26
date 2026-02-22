@@ -112,7 +112,6 @@ export function QuestionsTable({
             <TableHead>Process</TableHead>
             <TableHead>Question</TableHead>
             <TableHead>Class % Correct</TableHead>
-            <TableHead>Correct / Attempts</TableHead>
             <TableHead>Skill Tags</TableHead>
             <TableHead>Flag</TableHead>
           </TableRow>
@@ -130,9 +129,6 @@ export function QuestionsTable({
                 <TableCell>Q{question.questionId}</TableCell>
                 <TableCell>{question.classCorrectPct.toFixed(2)}%</TableCell>
                 <TableCell>
-                  {question.correctCount} / {question.attempts}
-                </TableCell>
-                <TableCell>
                   {question.skillTags.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                       {question.skillTags.map((tag) => (
@@ -146,10 +142,12 @@ export function QuestionsTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  {question.flagged ? (
-                    <Badge variant="destructive">Flagged</Badge>
-                  ) : testedQuestionIds.has(question.questionId) ? (
-                    <Badge variant="success">Tested</Badge>
+                  {testedQuestionIds.has(question.questionId) ? (
+                    question.flagged ? (
+                      <Badge variant="destructive">Weak</Badge>
+                    ) : (
+                      <Badge variant="success">Strong</Badge>
+                    )
                   ) : (
                     <Badge variant="secondary">Not Tested</Badge>
                   )}
