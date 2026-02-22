@@ -11,9 +11,11 @@ import {
 
 type StudentsTableProps = {
   students: StudentRow[];
+  thresholdPct: number;
+  hasProcessed: boolean;
 };
 
-export function StudentsTable({ students }: StudentsTableProps) {
+export function StudentsTable({ students, thresholdPct, hasProcessed }: StudentsTableProps) {
   return (
     <Table className="min-w-full text-left">
       <TableHeader>
@@ -25,7 +27,10 @@ export function StudentsTable({ students }: StudentsTableProps) {
       </TableHeader> 
       <TableBody>
           {students.map((student) => (
-            <TableRow key={student.studentId}>
+            <TableRow
+              key={student.studentId}
+              className={hasProcessed && student.scorePct < thresholdPct ? "bg-red-50" : ""}
+            >
               <TableCell>{student.name}</TableCell>
               <TableCell>{student.scorePct.toFixed(2)}%</TableCell>
               <TableCell>

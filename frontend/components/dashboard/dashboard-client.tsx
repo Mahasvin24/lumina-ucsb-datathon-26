@@ -418,7 +418,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
           </label>
         }
       >
-        <StudentsTable students={displayedStudents} />
+        <StudentsTable students={displayedStudents} thresholdPct={studentThresholdPct} hasProcessed={testedQuestionIds.length > 0} />
       </SectionCard>
 
       <SectionCard title="Student x Question Matrix">
