@@ -1,77 +1,47 @@
-import { DashboardPayload } from "@/lib/dashboard-api";
+import { ConceptAccuracy } from "@/lib/dashboard-api";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription } from "@/components/ui/card";
 
 type RemediationPanelProps = {
-  data: DashboardPayload;
+  conceptAccuracies: ConceptAccuracy[];
 };
 
-export function RemediationPanel({ data }: RemediationPanelProps) {
-  const settings = data.settings;
-  const remediation = data.remediation;
-  const flaggedNames = data.students
-    .filter((student) => remediation.flaggedStudentIds.includes(student.studentId))
-    .map((student) => student.name);
+function accuracyColor(pct: number): { bg: string; text: string; border: string } {
+  if (pct < 40) return { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-300" };
+  if (pct < 60) return { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" };
+  if (pct < 80) return { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-300" };
+  return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" };
+}
+
+export function RemediationPanel({ conceptAccuracies }: RemediationPanelProps) {
+  if (conceptAccuracies.length === 0) {
+    return (
+      <p className="py-4 text-center text-sm text-zinc-400">
+        Process questions to view skill tag performance.
+      </p>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2">
-        <Card className="bg-zinc-50 shadow-none">
-          <CardContent className="p-3">
-            <CardDescription className="text-xs uppercase tracking-wide">
-            Include Rules
-            </CardDescription>
-            <p className="mt-2 text-sm text-zinc-700">
-            Questions below {settings.questionThresholdPct.toFixed(0)}% class
-            correct, questions missed by students below{" "}
-            {settings.studentThresholdPct.toFixed(0)}%, and top{" "}
-            {settings.topNHardest} hardest.
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="bg-zinc-50 shadow-none">
-          <CardContent className="p-3">
-            <CardDescription className="text-xs uppercase tracking-wide">
-            Student Group
-            </CardDescription>
-            <p className="mt-2 text-sm text-zinc-700">
-            {flaggedNames.length > 0 ? flaggedNames.join(", ") : "No flagged students"}
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+        <span className="font-medium">Legend:</span>
+        <Badge className="border-rose-300 bg-rose-50 text-rose-700">&lt; 40%</Badge>
+        <Badge className="border-amber-300 bg-amber-50 text-amber-700">40–59%</Badge>
+        <Badge className="border-sky-300 bg-sky-50 text-sky-700">60–79%</Badge>
+        <Badge className="border-emerald-300 bg-emerald-50 text-emerald-700">≥ 80%</Badge>
       </div>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card className="shadow-none">
-          <CardContent className="p-3">
-            <CardDescription className="text-xs">Questions selected</CardDescription>
-            <p className="text-xl font-semibold">{remediation.questionCount}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-none">
-          <CardContent className="p-3">
-            <CardDescription className="text-xs">Estimated time</CardDescription>
-            <p className="text-xl font-semibold">
-            {remediation.estimatedTimeMinutes} min
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-none">
-          <CardContent className="p-3">
-            <CardDescription className="text-xs">Skill coverage</CardDescription>
-            {remediation.skillCoverage.length > 0 ? (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {remediation.skillCoverage.map((skill) => (
-                  <Badge key={skill} variant="outline" className="text-xs font-normal">
-                    {skill}
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm font-medium">No concept tags</p>
-            )}
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap gap-2">
+        {conceptAccuracies.map((concept) => {
+          const c = accuracyColor(concept.correctPct);
+          return (
+            <Badge
+              key={concept.tag}
+              className={`${c.border} ${c.bg} ${c.text} text-xs font-normal`}
+            >
+              {concept.tag} — {concept.correctPct.toFixed(1)}%
+            </Badge>
+          );
+        })}
       </div>
     </div>
   );

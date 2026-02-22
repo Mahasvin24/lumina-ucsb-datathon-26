@@ -269,6 +269,29 @@ export function DashboardClient({ data }: DashboardClientProps) {
     return concepts.filter((c) => c.correctPct < questionThresholdPct).slice(0, 5);
   }, [displayedQuestions, questionThresholdPct]);
 
+  const allConceptAccuracies: ConceptAccuracy[] = useMemo(() => {
+    const conceptCorrect = new Map<string, number>();
+    const conceptTotal = new Map<string, number>();
+
+    for (const question of displayedQuestions) {
+      for (const tag of question.skillTags) {
+        conceptCorrect.set(tag, (conceptCorrect.get(tag) ?? 0) + question.correctCount);
+        conceptTotal.set(tag, (conceptTotal.get(tag) ?? 0) + question.attempts);
+      }
+    }
+
+    const concepts: ConceptAccuracy[] = [];
+    for (const [tag, total] of conceptTotal) {
+      if (total > 0) {
+        const correct = conceptCorrect.get(tag) ?? 0;
+        concepts.push({ tag, correctPct: Number(((correct / total) * 100).toFixed(2)) });
+      }
+    }
+
+    concepts.sort((a, b) => a.correctPct - b.correctPct);
+    return concepts;
+  }, [displayedQuestions]);
+
   const belowThresholdValueClass =
     displayedSummary.studentsBelowThresholdPct <= 20
       ? "text-emerald-700"
@@ -401,8 +424,8 @@ export function DashboardClient({ data }: DashboardClientProps) {
         <MatrixView questionIds={displayedMatrix.questionIds} rows={displayedMatrix.rows} />
       </SectionCard>
 
-      <SectionCard title="Remediation Test-Set Builder">
-        <RemediationPanel data={data} />
+      <SectionCard title="Skill Tag Overview">
+        <RemediationPanel conceptAccuracies={allConceptAccuracies} />
       </SectionCard>
     </>
   );
