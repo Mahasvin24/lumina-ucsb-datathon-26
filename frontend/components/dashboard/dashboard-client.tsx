@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { ConceptMasteryHeatmap } from "@/components/dashboard/concept-mastery-heatmap";
 import { MatrixView } from "@/components/dashboard/matrix-view";
 import { QuestionsTable } from "@/components/dashboard/questions-table";
 import { RemediationPanel } from "@/components/dashboard/remediation-panel";
@@ -436,12 +437,19 @@ export function DashboardClient({ data }: DashboardClientProps) {
         <MatrixView questionIds={displayedMatrix.questionIds} rows={displayedMatrix.rows} />
       </SectionCard>
 
-      <SectionCard title="Skill overview">
+      <SectionCard title="Skill Overview">
         <RemediationPanel conceptAccuracies={allConceptAccuracies} />
       </SectionCard>
 
       <SectionCard title="Score Distribution">
         <ScoreDistribution scores={displayedStudents.map((s) => s.scorePct)} />
+      </SectionCard>
+
+      <SectionCard title="Concept Mastery Heatmap">
+        <ConceptMasteryHeatmap
+          matrixRows={displayedMatrix.rows}
+          skillTagsByQuestion={skillTagsByQuestion}
+        />
       </SectionCard>
     </>
   );

@@ -5,13 +5,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-ROOT = Path("/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2")
+# Resolve paths relative to this script (students/load_students.py → repo root)
+_SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT = _SCRIPT_DIR.parent
 SRC = ROOT / "model-training/data/interim/question_level_long_clean.jsonl"
 OUT_DIR = ROOT / "students"
 PROCESSED_DIR = ROOT / "model-training/data/processed/dkt_qlevel_v1"
 ARTIFACTS_ROOT = ROOT / "model-training/artifacts/dkt_lstm"
 WEIGHTS_DIR = OUT_DIR / "student_weights"
-PREFERRED_RUNS = ["full_train_all_folds_v2", "full_train_all_folds"]
+PREFERRED_RUNS = ["cv_4epochs", "full_train_all_folds_v2", "full_train_all_folds"]
 
 
 def _read_first_user_ids(student_dir: Path) -> list[int]:

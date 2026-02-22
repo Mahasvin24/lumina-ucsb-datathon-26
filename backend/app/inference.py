@@ -60,7 +60,12 @@ def resolve_student_artifact(repo_root: Path, student_id: int) -> tuple[Path, di
         raise HTTPException(status_code=500, detail="Student summary missing model_with_memory_path.")
     artifact_path = Path(artifact_raw)
     if not artifact_path.exists():
-        raise HTTPException(status_code=404, detail=f"Model artifact missing: {artifact_path}")
+        # Fallback: resolve relative to repo (handles summary.json with paths from another machine)
+        fallback = repo_root / "students" / "student_weights" / Path(artifact_raw).name
+        if fallback.exists():
+            artifact_path = fallback
+        else:
+            raise HTTPException(status_code=404, detail=f"Model artifact missing: {artifact_path}")
     return artifact_path, selected
 
 
