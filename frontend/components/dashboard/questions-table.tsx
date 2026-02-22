@@ -79,7 +79,7 @@ export function QuestionsTable({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-zinc-600">
-          Checked questions are sent to backend for all discovered students.
+          Select questions to test student knowledge.
         </p>
         <Button
           type="button"
@@ -100,8 +100,8 @@ export function QuestionsTable({
         <Alert variant="success">
           <AlertDescription>
           {result.errors && result.errors.length > 0
-            ? `Processed with partial errors: ${result.students.length} students succeeded, ${result.errors.length} failed.`
-            : `Success: processed ${result.students.length} students.`}
+            ? `Predictions ready for ${result.students.length} students (${result.errors.length} could not be analyzed).`
+            : `Predictions ready — ${result.students.length} student${result.students.length === 1 ? "" : "s"} analyzed across ${result.selected_question_ids.length} question${result.selected_question_ids.length === 1 ? "" : "s"}.`}
           </AlertDescription>
         </Alert>
       ) : null}

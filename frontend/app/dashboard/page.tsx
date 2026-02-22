@@ -36,10 +36,9 @@ export default async function DashboardPage() {
   return (
     <main className="mx-auto min-h-screen max-w-7xl space-y-6 bg-zinc-50 p-6">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold text-zinc-900">Test Set Summary</h1>
+        <h1 className="text-3xl font-semibold text-zinc-900">Lumina Dashboard</h1>
         <p className="text-sm text-zinc-600">
-          Real metrics from <code>students/student_*.csv</code> and{" "}
-          <code>students/test_questions.csv</code>.
+          Illuminating Student Learning Through Deep Knowledge Tracing
         </p>
       </header>
 

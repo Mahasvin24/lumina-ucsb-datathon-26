@@ -7,6 +7,7 @@ import { QuestionsTable } from "@/components/dashboard/questions-table";
 import { RemediationPanel } from "@/components/dashboard/remediation-panel";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { ScoreDistribution } from "@/components/dashboard/score-distribution";
 import { StudentsTable } from "@/components/dashboard/students-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
@@ -392,7 +393,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
       )}
 
       <SectionCard
-        title="Students Table"
+        title="Student Predicted Performance"
         subtitle={
           <label className="inline-flex items-center gap-2 text-sm text-zinc-500">
             Flag students below
@@ -426,6 +427,10 @@ export function DashboardClient({ data }: DashboardClientProps) {
 
       <SectionCard title="Skill Tag Overview">
         <RemediationPanel conceptAccuracies={allConceptAccuracies} />
+      </SectionCard>
+
+      <SectionCard title="Score Distribution">
+        <ScoreDistribution scores={displayedStudents.map((s) => s.scorePct)} />
       </SectionCard>
     </>
   );
