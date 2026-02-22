@@ -1,4 +1,5 @@
 import { DashboardPayload } from "@/lib/dashboard-api";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
 
 type RemediationPanelProps = {
@@ -58,11 +59,17 @@ export function RemediationPanel({ data }: RemediationPanelProps) {
         <Card className="shadow-none">
           <CardContent className="p-3">
             <CardDescription className="text-xs">Skill coverage</CardDescription>
-            <p className="text-sm font-medium">
-            {remediation.skillCoverage.length > 0
-              ? remediation.skillCoverage.join(", ")
-              : "No concept tags"}
-            </p>
+            {remediation.skillCoverage.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {remediation.skillCoverage.map((skill) => (
+                  <Badge key={skill} variant="outline" className="text-xs font-normal">
+                    {skill}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm font-medium">No concept tags</p>
+            )}
           </CardContent>
         </Card>
       </div>

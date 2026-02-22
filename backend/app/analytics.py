@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from backend.app.concept_tags import get_tag_label
+
 
 @dataclass
 class Attempt:
@@ -42,12 +44,14 @@ def _parse_concept_ids(raw: str) -> list[str]:
     return [value]
 
 
-def _load_test_question_ids(students_dir: Path) -> list[int]:
+def _load_test_questions(students_dir: Path) -> tuple[list[int], dict[int, list[str]]]:
+    """Return sorted test question IDs and a mapping of qid -> concept_ids."""
     path = students_dir / "test_questions.csv"
     if not path.exists():
         raise FileNotFoundError(f"Missing test question file: {path}")
 
     question_ids: list[int] = []
+    concept_map: dict[int, list[str]] = {}
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         if "question_id" not in (reader.fieldnames or []):
@@ -56,10 +60,11 @@ def _load_test_question_ids(students_dir: Path) -> list[int]:
             qid = _safe_int(row.get("question_id"))
             if qid > 0:
                 question_ids.append(qid)
+                concept_map[qid] = _parse_concept_ids(str(row.get("concept_ids", "")))
 
     if not question_ids:
         raise ValueError(f"No valid question_id rows found in: {path}")
-    return sorted(set(question_ids))
+    return sorted(set(question_ids)), concept_map
 
 
 def _load_students(students_dir: Path) -> list[StudentData]:
@@ -143,7 +148,7 @@ def build_dashboard_data(
 ) -> dict[str, Any]:
     students_dir = repo_root / "students"
     students = _load_students(students_dir)
-    test_qids = _load_test_question_ids(students_dir)
+    test_qids, test_question_concepts = _load_test_questions(students_dir)
     test_qid_set = set(test_qids)
     latest = _latest_test_attempts(students, test_qid_set)
     total_questions = len(test_qids)
@@ -154,7 +159,9 @@ def build_dashboard_data(
 
     per_question_correct: dict[int, int] = {qid: 0 for qid in test_qids}
     per_question_attempts: dict[int, int] = {qid: 0 for qid in test_qids}
-    per_question_concepts: dict[int, set[str]] = {qid: set() for qid in test_qids}
+    per_question_concepts: dict[int, set[str]] = {
+        qid: set(test_question_concepts.get(qid, [])) for qid in test_qids
+    }
     per_question_wrong_students: dict[int, list[int]] = {qid: [] for qid in test_qids}
 
     matrix_rows: list[dict[str, Any]] = []
@@ -188,7 +195,7 @@ def build_dashboard_data(
 
         most_missed_concept = "None"
         if concept_miss_counts:
-            most_missed_concept = max(concept_miss_counts, key=concept_miss_counts.get)
+            most_missed_concept = get_tag_label(max(concept_miss_counts, key=concept_miss_counts.get))
 
         if score_pct < student_threshold:
             flagged_students.append(student.student_id)
@@ -234,10 +241,31 @@ def build_dashboard_data(
                 "classCorrectPct": accuracy,
                 "correctCount": correct,
                 "attempts": attempts,
-                "skillTags": sorted(per_question_concepts[qid]),
+                "skillTags": sorted({get_tag_label(c) for c in per_question_concepts[qid]}),
                 "flagged": flagged,
             }
         )
+
+    # Per-concept accuracy: aggregate across all student-question attempts
+    concept_correct: dict[str, int] = {}
+    concept_total: dict[str, int] = {}
+    for qid in test_qids:
+        concepts = per_question_concepts[qid]
+        q_correct = per_question_correct[qid]
+        q_attempts = per_question_attempts[qid]
+        for concept in concepts:
+            concept_correct[concept] = concept_correct.get(concept, 0) + q_correct
+            concept_total[concept] = concept_total.get(concept, 0) + q_attempts
+
+    concept_accuracy_rows: list[dict[str, Any]] = []
+    for concept_id, total in concept_total.items():
+        if total > 0:
+            correct = concept_correct.get(concept_id, 0)
+            concept_accuracy_rows.append({
+                "tag": get_tag_label(concept_id),
+                "correctPct": _pct(correct, total),
+            })
+    concept_accuracy_rows.sort(key=lambda item: item["correctPct"])
 
     question_rows.sort(key=lambda item: item["classCorrectPct"])
     hardest = question_rows[0] if question_rows else None
@@ -292,6 +320,7 @@ def build_dashboard_data(
             "totalQuestions": total_questions,
         },
         "summary": summary,
+        "conceptAccuracy": concept_accuracy_rows,
         "students": sorted(student_rows, key=lambda item: item["scorePct"]),
         "questions": question_rows,
         "matrix": {

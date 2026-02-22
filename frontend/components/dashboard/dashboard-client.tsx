@@ -8,7 +8,10 @@ import { RemediationPanel } from "@/components/dashboard/remediation-panel";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { StudentsTable } from "@/components/dashboard/students-table";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import {
+  ConceptAccuracy,
   DashboardPayload,
   ProcessSelectedQuestionsResponse,
 } from "@/lib/dashboard-api";
@@ -205,6 +208,12 @@ export function DashboardClient({ data }: DashboardClientProps) {
     };
   }, [displayedStudents, displayedQuestions, studentThresholdPct, testedQuestionIds.length]);
 
+  const mostMissedConcepts: ConceptAccuracy[] = useMemo(() => {
+    return data.conceptAccuracy
+      .filter((c) => c.correctPct < questionThresholdPct)
+      .slice(0, 5);
+  }, [data.conceptAccuracy, questionThresholdPct]);
+
   const belowThresholdValueClass =
     displayedSummary.studentsBelowThresholdPct <= 20
       ? "text-emerald-700"
@@ -241,6 +250,33 @@ export function DashboardClient({ data }: DashboardClientProps) {
           valueClassName={belowThresholdValueClass}
         />
       </section>
+
+      {mostMissedConcepts.length > 0 && (
+        <SectionCard
+          title="Most Missed Concepts"
+          subtitle={
+            <span className="text-sm text-zinc-500">
+              Concepts below {questionThresholdPct}% class accuracy (top 5)
+            </span>
+          }
+        >
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {mostMissedConcepts.map((concept) => (
+              <Card key={concept.tag} className="bg-zinc-50">
+                <CardContent className="flex items-center justify-between gap-3 p-3">
+                  <span className="text-sm font-medium text-zinc-800">{concept.tag}</span>
+                  <Badge
+                    variant={concept.correctPct < 30 ? "destructive" : "outline"}
+                    className="shrink-0"
+                  >
+                    {concept.correctPct.toFixed(1)}%
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
       <SectionCard
         title="Students Table"

@@ -52,9 +52,15 @@ export type MatrixRow = {
   cells: MatrixCell[];
 };
 
+export type ConceptAccuracy = {
+  tag: string;
+  correctPct: number;
+};
+
 export type DashboardPayload = {
   settings: DashboardSettings;
   summary: DashboardSummary;
+  conceptAccuracy: ConceptAccuracy[];
   students: StudentRow[];
   questions: QuestionRow[];
   matrix: {

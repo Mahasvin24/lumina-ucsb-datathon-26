@@ -133,9 +133,17 @@ export function QuestionsTable({
                   {question.correctCount} / {question.attempts}
                 </TableCell>
                 <TableCell>
-                  {question.skillTags.length > 0
-                    ? question.skillTags.join(", ")
-                    : "None"}
+                  {question.skillTags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {question.skillTags.map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs font-normal">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    "None"
+                  )}
                 </TableCell>
                 <TableCell>
                   {question.flagged ? (
