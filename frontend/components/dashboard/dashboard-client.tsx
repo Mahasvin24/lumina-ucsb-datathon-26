@@ -16,6 +16,7 @@ import {
   DashboardPayload,
   ProcessSelectedQuestionsResponse,
 } from "@/lib/dashboard-api";
+import { useProcessedData } from "@/lib/processed-data-context";
 
 type DashboardClientProps = {
   data: DashboardPayload;
@@ -49,6 +50,7 @@ function clampProbability(value: number): number {
 }
 
 export function DashboardClient({ data }: DashboardClientProps) {
+  const { setProcessedData } = useProcessedData();
   const [processedResult, setProcessedResult] = useState<ProcessSelectedQuestionsResponse | null>(null);
   const [testedQuestionIds, setTestedQuestionIds] = useState<number[]>([]);
   const [studentThresholdPct, setStudentThresholdPct] = useState<number>(
@@ -361,6 +363,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
           onProcessedSelection={(questionIds, result) => {
             setTestedQuestionIds(questionIds);
             setProcessedResult(result);
+            setProcessedData(questionIds, result);
           }}
         />
       </SectionCard>

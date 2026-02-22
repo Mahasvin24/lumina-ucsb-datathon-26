@@ -9,7 +9,7 @@ import pandas as pd
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
-from backend.app.analytics import build_dashboard_data
+from backend.app.analytics import build_dashboard_data, build_student_detail
 from backend.app.inference import load_model, predict_probabilities, resolve_student_artifact
 from backend.app.parsing import parse_enriched_csv
 
@@ -92,6 +92,16 @@ async def predict(student_id: int = Form(...), file: UploadFile = File(...)) -> 
         "user_id": summary_row.get("user_id"),
         "probabilities": probabilities,
     }
+
+
+@router.get("/student-data/{student_id}")
+def student_data(student_id: int) -> dict[str, object]:
+    try:
+        return build_student_detail(REPO_ROOT, student_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/dashboard-data")

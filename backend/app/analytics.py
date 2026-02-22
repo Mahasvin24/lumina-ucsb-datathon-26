@@ -329,3 +329,90 @@ def build_dashboard_data(
             "previewQuestions": remediation_question_rows,
         },
     }
+
+
+def build_student_detail(repo_root: Path, student_id: int) -> dict[str, Any]:
+    """Build a detailed performance profile for a single student."""
+    students_dir = repo_root / "students"
+    students = _load_students(students_dir)
+    test_qids, test_question_concepts = _load_test_questions(students_dir)
+    test_qid_set = set(test_qids)
+    total_questions = len(test_qids)
+
+    student = next((s for s in students if s.student_id == student_id), None)
+    if student is None:
+        raise ValueError(f"Student {student_id} not found")
+
+    latest = _latest_test_attempts([student], test_qid_set)
+    per_q = latest.get(student.student_id, {})
+
+    answered = len(per_q)
+    correct = sum(1 for a in per_q.values() if a.response == 1)
+    score_pct = _pct(correct, total_questions)
+    completion_pct = _pct(answered, total_questions)
+    status = "Complete" if answered == total_questions else "Incomplete"
+
+    attempts_sorted = sorted(per_q.values(), key=lambda item: item.timestamp)
+    if attempts_sorted and attempts_sorted[0].timestamp > 0 and attempts_sorted[-1].timestamp > 0:
+        total_minutes = round(
+            max(0, attempts_sorted[-1].timestamp - attempts_sorted[0].timestamp) / 60000.0, 2,
+        )
+    else:
+        total_minutes = 0.0
+
+    tag_correct: dict[str, int] = {}
+    tag_total: dict[str, int] = {}
+    for qid in test_qids:
+        concepts = set(test_question_concepts.get(qid, []))
+        attempt = per_q.get(qid)
+        if attempt is None:
+            continue
+        for concept_id in concepts:
+            label = get_tag_label(concept_id)
+            tag_total[label] = tag_total.get(label, 0) + 1
+            tag_correct[label] = tag_correct.get(label, 0) + attempt.response
+
+    tag_performance: list[dict[str, Any]] = []
+    for tag, total in tag_total.items():
+        c = tag_correct.get(tag, 0)
+        tag_performance.append({
+            "tag": tag,
+            "correctCount": c,
+            "totalCount": total,
+            "correctPct": _pct(c, total),
+        })
+    tag_performance.sort(key=lambda item: item["correctPct"])
+
+    with_attempts = [t for t in tag_performance if t["totalCount"] > 0]
+    weakest_tags = with_attempts[:3]
+    strongest_tags = list(reversed(with_attempts[-3:])) if len(with_attempts) >= 3 else list(reversed(with_attempts))
+
+    questions: list[dict[str, Any]] = []
+    for qid in test_qids:
+        attempt = per_q.get(qid)
+        state = "unanswered" if attempt is None else ("correct" if attempt.response == 1 else "wrong")
+        concepts = set(test_question_concepts.get(qid, []))
+        skill_tags = sorted({get_tag_label(c) for c in concepts})
+        questions.append({
+            "questionId": qid,
+            "state": state,
+            "skillTags": skill_tags,
+        })
+
+    return {
+        "studentId": student.student_id,
+        "name": f"Student {student.student_id}",
+        "userId": student.user_id,
+        "scorePct": score_pct,
+        "correctCount": correct,
+        "totalQuestions": total_questions,
+        "answeredCount": answered,
+        "completionPct": completion_pct,
+        "status": status,
+        "timeSpentMinutes": total_minutes,
+        "medianSpacingMinutes": _median_time_minutes(attempts_sorted),
+        "tagPerformance": tag_performance,
+        "strongestTags": strongest_tags,
+        "weakestTags": weakest_tags,
+        "questions": questions,
+    }

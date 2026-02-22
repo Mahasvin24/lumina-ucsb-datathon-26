@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { MatrixRow } from "@/lib/dashboard-api";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -69,7 +71,14 @@ export function MatrixView({ questionIds, rows }: MatrixViewProps) {
       <TableBody>
           {rows.map((row) => (
             <TableRow key={row.studentId}>
-              <TableCell className="text-left text-sm">{row.name}</TableCell>
+              <TableCell className="text-left text-sm">
+                <Link
+                  href={`/dashboard/student/${row.studentId}`}
+                  className="text-sky-600 underline decoration-sky-300 hover:text-sky-800"
+                >
+                  {row.name}
+                </Link>
+              </TableCell>
               {row.cells.map((cell) => (
                 <TableCell key={`${row.studentId}-${cell.questionId}`} className="text-center">
                   {renderCell(cell.state, cell.probability)}

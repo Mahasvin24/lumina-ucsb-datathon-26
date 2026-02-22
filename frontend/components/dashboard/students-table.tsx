@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { StudentRow } from "@/lib/dashboard-api";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,7 +33,14 @@ export function StudentsTable({ students, thresholdPct, hasProcessed }: Students
               key={student.studentId}
               className={hasProcessed && student.scorePct < thresholdPct ? "bg-red-50 hover:bg-red-100" : ""}
             >
-              <TableCell>{student.name}</TableCell>
+              <TableCell>
+                <Link
+                  href={`/dashboard/student/${student.studentId}`}
+                  className="text-sky-600 underline decoration-sky-300 hover:text-sky-800"
+                >
+                  {student.name}
+                </Link>
+              </TableCell>
               <TableCell>{student.scorePct.toFixed(2)}%</TableCell>
               <TableCell>
                 {student.areasToStudy.length > 0 ? (

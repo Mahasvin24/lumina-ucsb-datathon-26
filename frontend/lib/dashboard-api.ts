@@ -106,6 +106,37 @@ export type ProcessSelectedQuestionsResponse = {
   errors?: ProcessSelectedQuestionsError[];
 };
 
+export type StudentTagPerformance = {
+  tag: string;
+  correctCount: number;
+  totalCount: number;
+  correctPct: number;
+};
+
+export type StudentQuestionDetail = {
+  questionId: number;
+  state: "correct" | "wrong" | "unanswered";
+  skillTags: string[];
+};
+
+export type StudentDetail = {
+  studentId: number;
+  name: string;
+  userId: number;
+  scorePct: number;
+  correctCount: number;
+  totalQuestions: number;
+  answeredCount: number;
+  completionPct: number;
+  status: "Complete" | "Incomplete";
+  timeSpentMinutes: number;
+  medianSpacingMinutes: number;
+  tagPerformance: StudentTagPerformance[];
+  strongestTags: StudentTagPerformance[];
+  weakestTags: StudentTagPerformance[];
+  questions: StudentQuestionDetail[];
+};
+
 type DashboardQuery = {
   studentThresholdPct?: number;
   questionThresholdPct?: number;
@@ -147,6 +178,17 @@ export async function getDashboardData(
     throw new Error(`Dashboard API failed (${response.status}): ${details}`);
   }
   return (await response.json()) as DashboardPayload;
+}
+
+export async function getStudentData(studentId: number): Promise<StudentDetail> {
+  const baseUrl = resolveBackendBaseUrl();
+  const url = `${baseUrl}/student-data/${studentId}`;
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Student API failed (${response.status}): ${details}`);
+  }
+  return (await response.json()) as StudentDetail;
 }
 
 export async function processSelectedQuestions(
