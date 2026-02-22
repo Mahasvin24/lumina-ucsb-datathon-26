@@ -16,7 +16,7 @@ export function RemediationPanel({ conceptAccuracies }: RemediationPanelProps) {
   if (conceptAccuracies.length === 0) {
     return (
       <p className="py-4 text-center text-sm text-zinc-400">
-        Process questions to view skill tag performance.
+        Process questions to view skill performance.
       </p>
     );
   }

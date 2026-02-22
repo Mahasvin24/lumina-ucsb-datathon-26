@@ -146,7 +146,7 @@ export function QuestionsTable({
             <TableHead>Process</TableHead>
             <TableHead>Question</TableHead>
             <TableHead>Class % Correct</TableHead>
-            <TableHead>Skill Tags</TableHead>
+            <TableHead>Skills</TableHead>
             <TableHead>Flag</TableHead>
           </TableRow>
         </TableHeader>

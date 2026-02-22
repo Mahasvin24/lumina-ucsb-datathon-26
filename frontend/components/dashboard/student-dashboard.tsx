@@ -6,7 +6,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -152,35 +151,11 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
   );
 
   const chartData = useMemo(() => {
-    if (!hasPredictions || !predictedTagPerformance) {
-      return data.tagPerformance.map((t) => ({
-        tag: t.tag,
-        accuracy: t.correctPct,
-        correct: t.correctCount,
-        total: t.totalCount,
-      }));
-    }
-    const predictedMap = new Map(
-      predictedTagPerformance.map((t) => [t.tag, t]),
-    );
-    const allTags = new Set([
-      ...data.tagPerformance.map((t) => t.tag),
-      ...predictedTagPerformance.map((t) => t.tag),
-    ]);
-    return [...allTags]
-      .map((tag) => {
-        const raw = data.tagPerformance.find((t) => t.tag === tag);
-        const pred = predictedMap.get(tag);
-        return {
-          tag,
-          accuracy: raw?.correctPct ?? 0,
-          correct: raw?.correctCount ?? 0,
-          total: raw?.totalCount ?? 0,
-          predicted: pred?.correctPct ?? 0,
-        };
-      })
+    if (!hasPredictions || !predictedTagPerformance) return [];
+    return [...predictedTagPerformance]
+      .map((t) => ({ tag: t.tag, accuracy: t.correctPct }))
       .sort((a, b) => a.accuracy - b.accuracy);
-  }, [data.tagPerformance, hasPredictions, predictedTagPerformance]);
+  }, [hasPredictions, predictedTagPerformance]);
 
   const chartHeight = Math.max(260, chartData.length * 36);
 
@@ -201,7 +176,7 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
     <>
       <section className="grid gap-3 grid-cols-2 max-w-md">
         {predictedScore !== null && (
-          <StatCard label="Predicted Score" value={`${predictedScore.toFixed(2)}%`} valueClassName={predictedScoreColor} />
+          <StatCard label="Content confidence score" value={`${predictedScore.toFixed(2)}%`} valueClassName={predictedScoreColor} />
         )}
         {questionsFedIn > 0 && (
           <StatCard label="Questions fed in" value={String(questionsFedIn)} />
@@ -210,20 +185,18 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard
-          title={hasPredictions ? "Predicted Weakest Tags" : "Weakest Tags"}
-          subtitle={<span className="text-sm text-zinc-500">{hasPredictions ? "Lowest predicted accuracy" : "Lowest accuracy concepts"}</span>}
+          title="Weakest skills"
+          subtitle={<span className="text-sm text-zinc-500">Lowest predicted accuracy</span>}
         >
-          {(hasPredictions ? predictedWeakest : data.weakestTags).length > 0 ? (
+          {predictedWeakest.length > 0 ? (
             <div className="space-y-2">
-              {(hasPredictions ? predictedWeakest : data.weakestTags).map((tag) => (
+              {predictedWeakest.map((tag) => (
                 <Card key={tag.tag} className="bg-zinc-50">
                   <CardContent className="flex items-center justify-between gap-3 p-3">
                     <div>
                       <span className="text-sm font-medium text-zinc-800">{tag.tag}</span>
                       <span className="ml-2 text-xs text-zinc-500">
-                        {hasPredictions
-                          ? `${tag.correctPct.toFixed(1)}% predicted`
-                          : `${tag.correctCount}/${tag.totalCount} correct`}
+                        {tag.correctPct.toFixed(1)}%
                       </span>
                     </div>
                     <TagBadge tag={tag} />
@@ -232,25 +205,25 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
               ))}
             </div>
           ) : (
-            <p className="py-4 text-center text-sm text-zinc-400">No tag data available.</p>
+            <p className="py-4 text-center text-sm text-zinc-400">
+              {hasPredictions ? "No skill data available." : "Process questions on the dashboard to see predicted skill performance."}
+            </p>
           )}
         </SectionCard>
 
         <SectionCard
-          title={hasPredictions ? "Predicted Strongest Tags" : "Strongest Tags"}
-          subtitle={<span className="text-sm text-zinc-500">{hasPredictions ? "Highest predicted accuracy" : "Highest accuracy concepts"}</span>}
+          title="Strongest skills"
+          subtitle={<span className="text-sm text-zinc-500">Highest predicted accuracy</span>}
         >
-          {(hasPredictions ? predictedStrongest : data.strongestTags).length > 0 ? (
+          {predictedStrongest.length > 0 ? (
             <div className="space-y-2">
-              {(hasPredictions ? predictedStrongest : data.strongestTags).map((tag) => (
+              {predictedStrongest.map((tag) => (
                 <Card key={tag.tag} className="bg-zinc-50">
                   <CardContent className="flex items-center justify-between gap-3 p-3">
                     <div>
                       <span className="text-sm font-medium text-zinc-800">{tag.tag}</span>
                       <span className="ml-2 text-xs text-zinc-500">
-                        {hasPredictions
-                          ? `${tag.correctPct.toFixed(1)}% predicted`
-                          : `${tag.correctCount}/${tag.totalCount} correct`}
+                        {tag.correctPct.toFixed(1)}%
                       </span>
                     </div>
                     <TagBadge tag={tag} />
@@ -259,16 +232,18 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
               ))}
             </div>
           ) : (
-            <p className="py-4 text-center text-sm text-zinc-400">No tag data available.</p>
+            <p className="py-4 text-center text-sm text-zinc-400">
+              {hasPredictions ? "No skill data available." : "Process questions on the dashboard to see predicted skill performance."}
+            </p>
           )}
         </SectionCard>
       </div>
 
       <SectionCard
-        title="Tag Performance"
+        title="Skill performance"
         subtitle={
           <span className="text-sm text-zinc-500">
-            {hasPredictions ? "Historical vs. predicted accuracy" : "Accuracy across all concept tags"}
+            Predicted accuracy by skill
           </span>
         }
       >
@@ -281,23 +256,17 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
               <Tooltip
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: "1px solid #e4e4e7", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}
               />
-              <Bar dataKey="accuracy" name="Historical" radius={[0, 4, 4, 0]} barSize={hasPredictions ? 14 : 20}>
+              <Bar dataKey="accuracy" name="Predicted" radius={[0, 4, 4, 0]} barSize={20}>
                 {chartData.map((entry) => (
                   <Cell key={entry.tag} fill={barColor(entry.accuracy)} />
                 ))}
               </Bar>
-              {hasPredictions && (
-                <Bar dataKey="predicted" name="Predicted" radius={[0, 4, 4, 0]} barSize={14} fillOpacity={0.7}>
-                  {chartData.map((entry) => (
-                    <Cell key={entry.tag} fill={barColor(entry.predicted ?? 0)} />
-                  ))}
-                </Bar>
-              )}
-              {hasPredictions && <Legend />}
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <p className="py-4 text-center text-sm text-zinc-400">No tag data available.</p>
+          <p className="py-4 text-center text-sm text-zinc-400">
+            {hasPredictions ? "No skill data available." : "Process questions on the dashboard to see predicted skill performance."}
+          </p>
         )}
       </SectionCard>
 
@@ -308,49 +277,41 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
               <TableHead className="w-24">Question</TableHead>
               <TableHead className="w-24">Status</TableHead>
               {hasPredictions && <TableHead className="w-28">Predicted</TableHead>}
-              <TableHead>Skill Tags</TableHead>
+              <TableHead>Skills</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.questions.map((q) => {
-              const prediction = studentPredictions?.get(q.questionId);
-              const isTested = testedSet.has(q.questionId);
-              return (
-                <TableRow
-                  key={q.questionId}
-                  className={q.state === "wrong" ? "bg-red-50 hover:bg-red-100" : ""}
-                >
-                  <TableCell className="font-medium">Q{q.questionId}</TableCell>
-                  <TableCell>
-                    {q.state === "correct" && <Badge variant="success">Correct</Badge>}
-                    {q.state === "wrong" && <Badge variant="destructive">Wrong</Badge>}
-                    {q.state === "unanswered" && <Badge variant="secondary">Unanswered</Badge>}
-                  </TableCell>
-                  {hasPredictions && (
+            {data.questions
+              .filter((q) => hasPredictions && testedSet.has(q.questionId) && studentPredictions?.get(q.questionId) !== undefined)
+              .map((q) => {
+                const prediction = studentPredictions!.get(q.questionId)!;
+                return (
+                  <TableRow key={q.questionId}>
+                    <TableCell className="font-medium">Q{q.questionId}</TableCell>
                     <TableCell>
-                      {isTested && prediction !== undefined ? (
+                      <Badge variant="secondary">Answered</Badge>
+                    </TableCell>
+                    {hasPredictions && (
+                      <TableCell>
                         <ProbabilityBadge probability={prediction} />
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      {q.skillTags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {q.skillTags.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs font-normal">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-zinc-400">—</span>
                       )}
                     </TableCell>
-                  )}
-                  <TableCell>
-                    {q.skillTags.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {q.skillTags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs font-normal">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-zinc-400">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                  </TableRow>
+                );
+              })}
           </TableBody>
         </Table>
       </SectionCard>

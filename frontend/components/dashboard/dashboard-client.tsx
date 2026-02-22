@@ -436,7 +436,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
         <MatrixView questionIds={displayedMatrix.questionIds} rows={displayedMatrix.rows} />
       </SectionCard>
 
-      <SectionCard title="Skill Tag Overview">
+      <SectionCard title="Skill overview">
         <RemediationPanel conceptAccuracies={allConceptAccuracies} />
       </SectionCard>
 
