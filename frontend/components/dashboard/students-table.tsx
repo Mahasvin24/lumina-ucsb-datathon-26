@@ -29,7 +29,7 @@ export function StudentsTable({ students, thresholdPct, hasProcessed }: Students
           {students.map((student) => (
             <TableRow
               key={student.studentId}
-              className={hasProcessed && student.scorePct < thresholdPct ? "bg-red-50" : ""}
+              className={hasProcessed && student.scorePct < thresholdPct ? "bg-red-50 hover:bg-red-100" : ""}
             >
               <TableCell>{student.name}</TableCell>
               <TableCell>{student.scorePct.toFixed(2)}%</TableCell>
