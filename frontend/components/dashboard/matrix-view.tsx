@@ -30,10 +30,13 @@ function clampProbability(value: number): number {
 function renderCell(state: "correct" | "wrong" | "unanswered", probability?: number) {
   if (probability !== undefined) {
     const p = clampProbability(probability);
-    const hue = Math.round(p * 120); // 0=red, 120=green
+    const curved = Math.pow(p, 2.2);
+    const hue = Math.round(curved * 120);
+    const saturation = 50 + Math.round(Math.abs(p - 0.5) * 50);
+    const lightness = 48 - Math.round(Math.abs(p - 0.5) * 16);
     const style = {
       backgroundColor: `hsl(${hue} 92% 72%)`,
-      color: `hsl(${hue} 72% 16%)`,
+      color: `hsl(${hue} 12% 16%)`,
     };
     return (
       <Badge className="inline-block border-transparent px-2 py-1 tabular-nums" style={style}>
