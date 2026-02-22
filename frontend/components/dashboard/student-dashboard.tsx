@@ -176,7 +176,7 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
     <>
       <section className="grid gap-3 grid-cols-2 max-w-md">
         {predictedScore !== null && (
-          <StatCard label="Content confidence score" value={`${predictedScore.toFixed(2)}%`} valueClassName={predictedScoreColor} />
+          <StatCard label="Confidence Score" value={`${predictedScore.toFixed(2)}%`} valueClassName={predictedScoreColor} />
         )}
         {questionsFedIn > 0 && (
           <StatCard label="Questions fed in" value={String(questionsFedIn)} />
