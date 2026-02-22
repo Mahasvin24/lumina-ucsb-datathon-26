@@ -1,0 +1,42 @@
+[
+  {
+    "student_file": "student_1.csv",
+    "user_id": 13107,
+    "fold_id": 0,
+    "feature_rows": 205,
+    "memory_state_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_1_memory_state.pt",
+    "model_with_memory_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_1_model_with_memory.pt"
+  },
+  {
+    "student_file": "student_2.csv",
+    "user_id": 5022,
+    "fold_id": 1,
+    "feature_rows": 407,
+    "memory_state_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_2_memory_state.pt",
+    "model_with_memory_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_2_model_with_memory.pt"
+  },
+  {
+    "student_file": "student_3.csv",
+    "user_id": 1171,
+    "fold_id": 4,
+    "feature_rows": 259,
+    "memory_state_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_3_memory_state.pt",
+    "model_with_memory_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_3_model_with_memory.pt"
+  },
+  {
+    "student_file": "student_4.csv",
+    "user_id": 424,
+    "fold_id": 3,
+    "feature_rows": 276,
+    "memory_state_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_4_memory_state.pt",
+    "model_with_memory_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_4_model_with_memory.pt"
+  },
+  {
+    "student_file": "student_5.csv",
+    "user_id": 8042,
+    "fold_id": 2,
+    "feature_rows": 224,
+    "memory_state_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_5_memory_state.pt",
+    "model_with_memory_path": "/Users/mahasvin/Github/lumina-ucsb-datathon-26-v2/students/student_weights/student_5_model_with_memory.pt"
+  }
+]
