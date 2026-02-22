@@ -19,10 +19,7 @@ export function StudentsTable({ students }: StudentsTableProps) {
         <TableRow>
           <TableHead>Student</TableHead>
           <TableHead>Score</TableHead>
-          <TableHead>Correct / Total</TableHead>
-          <TableHead>Completion</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Most Missed Concept</TableHead>
+          <TableHead className="w-[65%]">Most Missed Concept</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -30,12 +27,9 @@ export function StudentsTable({ students }: StudentsTableProps) {
             <TableRow key={student.studentId}>
               <TableCell>{student.name}</TableCell>
               <TableCell>{student.scorePct.toFixed(2)}%</TableCell>
-              <TableCell>
-                {student.correctCount} / {student.totalQuestions}
+              <TableCell className="max-w-0 whitespace-normal wrap-break-word">
+                {student.mostMissedConcept || "None"}
               </TableCell>
-              <TableCell>{student.completionPct.toFixed(2)}%</TableCell>
-              <TableCell>{student.status}</TableCell>
-              <TableCell>{student.mostMissedConcept}</TableCell>
             </TableRow>
           ))}
       </TableBody>

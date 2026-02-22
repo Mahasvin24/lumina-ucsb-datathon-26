@@ -9,7 +9,7 @@ import {
 
 type SectionCardProps = {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   children: ReactNode;
 };
 

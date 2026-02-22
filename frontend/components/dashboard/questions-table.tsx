@@ -22,13 +22,11 @@ import {
 
 type QuestionsTableProps = {
   questions: QuestionRow[];
-  questionThresholdPct: number;
   onProcessedSelection?: (questionIds: number[], result: ProcessSelectedQuestionsResponse) => void;
 };
 
 export function QuestionsTable({
   questions,
-  questionThresholdPct,
   onProcessedSelection,
 }: QuestionsTableProps) {
   const defaultSelected = useMemo(
@@ -39,6 +37,7 @@ export function QuestionsTable({
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProcessSelectedQuestionsResponse | null>(null);
+  const [testedQuestionIds, setTestedQuestionIds] = useState<Set<number>>(new Set());
 
   const toggle = (questionId: number) => {
     setSelected((prev) => {
@@ -67,6 +66,7 @@ export function QuestionsTable({
     try {
       const response = await processSelectedQuestions(checked);
       setResult(response);
+      setTestedQuestionIds(new Set(checked));
       onProcessedSelection?.(checked, response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown processing error.");
@@ -138,10 +138,12 @@ export function QuestionsTable({
                     : "None"}
                 </TableCell>
                 <TableCell>
-                  {question.classCorrectPct < questionThresholdPct ? (
+                  {question.flagged ? (
                     <Badge variant="destructive">Flagged</Badge>
+                  ) : testedQuestionIds.has(question.questionId) ? (
+                    <Badge variant="success">Tested</Badge>
                   ) : (
-                    <Badge variant="success">OK</Badge>
+                    <Badge variant="secondary">Not Tested</Badge>
                   )}
                 </TableCell>
               </TableRow>

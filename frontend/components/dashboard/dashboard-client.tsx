@@ -45,10 +45,15 @@ function clampProbability(value: number): number {
 }
 
 export function DashboardClient({ data }: DashboardClientProps) {
-  const [activeQuestionIds, setActiveQuestionIds] = useState<number[]>(data.matrix.questionIds);
   const [processedResult, setProcessedResult] = useState<ProcessSelectedQuestionsResponse | null>(null);
-
-  const activeQuestionIdSet = useMemo(() => new Set(activeQuestionIds), [activeQuestionIds]);
+  const [testedQuestionIds, setTestedQuestionIds] = useState<number[]>([]);
+  const [studentThresholdPct, setStudentThresholdPct] = useState<number>(
+    data.settings.studentThresholdPct,
+  );
+  const [questionThresholdPct, setQuestionThresholdPct] = useState<number>(
+    data.settings.questionThresholdPct,
+  );
+  const testedQuestionIdSet = useMemo(() => new Set(testedQuestionIds), [testedQuestionIds]);
   const probabilitiesByStudent = useMemo(() => {
     const probabilities = new Map<number, Map<number, number>>();
     if (!processedResult) {
@@ -66,20 +71,17 @@ export function DashboardClient({ data }: DashboardClientProps) {
   }, [processedResult]);
 
   const displayedQuestions = useMemo(() => {
-    const filteredBaseQuestions = data.questions.filter((question) =>
-      activeQuestionIdSet.has(question.questionId),
-    );
     if (!processedResult) {
-      return filteredBaseQuestions;
+      return data.questions;
     }
 
-    const skillTagsByQuestion = new Map(
-      data.questions.map((question) => [question.questionId, question.skillTags]),
-    );
+    return data.questions.map((question) => {
+      if (!testedQuestionIdSet.has(question.questionId)) {
+        return question;
+      }
 
-    return activeQuestionIds.map((questionId) => {
       const probabilities = processedResult.students
-        .map((student) => probabilitiesByStudent.get(student.student_id)?.get(questionId))
+        .map((student) => probabilitiesByStudent.get(student.student_id)?.get(question.questionId))
         .filter((value): value is number => value !== undefined);
 
       const attempts = probabilities.length;
@@ -87,43 +89,40 @@ export function DashboardClient({ data }: DashboardClientProps) {
       const classCorrectPct = attempts > 0 ? Number(((expectedCorrect / attempts) * 100).toFixed(2)) : 0;
 
       return {
-        questionId,
+        ...question,
         classCorrectPct,
         correctCount: Number(expectedCorrect.toFixed(2)),
         attempts,
-        skillTags: skillTagsByQuestion.get(questionId) || [],
-        flagged: classCorrectPct < data.settings.questionThresholdPct,
+        flagged: classCorrectPct < questionThresholdPct,
       };
     });
   }, [
     data.questions,
-    data.settings.questionThresholdPct,
-    activeQuestionIdSet,
-    activeQuestionIds,
     processedResult,
     probabilitiesByStudent,
+    testedQuestionIdSet,
+    questionThresholdPct,
   ]);
 
   const displayedMatrix = useMemo(() => {
     if (!processedResult) {
-      return {
-        questionIds: activeQuestionIds,
-        rows: data.matrix.rows.map((row) => ({
-          ...row,
-          cells: row.cells.filter((cell) => activeQuestionIdSet.has(cell.questionId)),
-        })),
-      };
+      return data.matrix;
     }
 
     const processedByStudent = new Map(processedResult.students.map((student) => [student.student_id, student]));
     return {
-      questionIds: activeQuestionIds,
+      questionIds: data.matrix.questionIds,
       rows: data.matrix.rows.map((row) => {
         const processed = processedByStudent.get(row.studentId);
         const probabilities = probabilitiesByStudent.get(row.studentId);
+        const baseCellsByQuestion = new Map(row.cells.map((cell) => [cell.questionId, cell]));
         return {
           ...row,
-          cells: activeQuestionIds.map((questionId) => {
+          cells: data.matrix.questionIds.map((questionId) => {
+            const baseCell = baseCellsByQuestion.get(questionId);
+            if (!testedQuestionIdSet.has(questionId)) {
+              return baseCell || { questionId, state: "unanswered" as const };
+            }
             if (!processed || !probabilities) {
               return { questionId, state: "unanswered" as const };
             }
@@ -140,86 +139,63 @@ export function DashboardClient({ data }: DashboardClientProps) {
         };
       }),
     };
-  }, [data.matrix.rows, activeQuestionIds, activeQuestionIdSet, processedResult, probabilitiesByStudent]);
+  }, [data.matrix, processedResult, probabilitiesByStudent, testedQuestionIdSet]);
 
   const displayedStudents = useMemo(() => {
-    const byStudentId = new Map(data.matrix.rows.map((row) => [row.studentId, row]));
-    const processedByStudent = new Map(
-      (processedResult?.students || []).map((student) => [student.student_id, student]),
-    );
-
     return data.students.map((student) => {
-      const total = activeQuestionIds.length;
-      const processed = processedByStudent.get(student.studentId);
-      const probabilities = probabilitiesByStudent.get(student.studentId);
+      const total = displayedMatrix.questionIds.length;
+      const matrixRow = displayedMatrix.rows.find((row) => row.studentId === student.studentId);
+      const cells = matrixRow?.cells || [];
 
-      if (processed && probabilities) {
-        const activeProbabilities = activeQuestionIds
-          .map((questionId) => probabilities.get(questionId))
-          .filter((value): value is number => value !== undefined);
-        const expectedCorrect = activeProbabilities.reduce((sum, value) => sum + value, 0);
-        const answered = activeProbabilities.length;
-        return {
-          ...student,
-          totalQuestions: total,
-          correctCount: Number(expectedCorrect.toFixed(2)),
-          answeredCount: answered,
-          scorePct: Number(pct(expectedCorrect, total).toFixed(2)),
-          completionPct: Number(pct(answered, total).toFixed(2)),
-          status: answered === total ? ("Complete" as const) : ("Incomplete" as const),
-        };
-      }
-
-      const matrixRow = byStudentId.get(student.studentId);
-      const cells = (matrixRow?.cells || []).filter((cell) => activeQuestionIdSet.has(cell.questionId));
-      const correct = cells.filter((cell) => cell.state === "correct").length;
-      const answered = cells.filter((cell) => cell.state !== "unanswered").length;
+      const expectedCorrect = cells.reduce((sum, cell) => {
+        if (cell.probability !== undefined) {
+          return sum + cell.probability;
+        }
+        if (cell.state === "correct") {
+          return sum + 1;
+        }
+        return sum;
+      }, 0);
+      const answered = cells.filter(
+        (cell) => cell.probability !== undefined || cell.state !== "unanswered",
+      ).length;
       return {
         ...student,
         totalQuestions: total,
-        correctCount: correct,
+        correctCount: Number(expectedCorrect.toFixed(2)),
         answeredCount: answered,
-        scorePct: Number(pct(correct, total).toFixed(2)),
+        scorePct: Number(pct(expectedCorrect, total).toFixed(2)),
         completionPct: Number(pct(answered, total).toFixed(2)),
         status: answered === total ? ("Complete" as const) : ("Incomplete" as const),
       };
     });
-  }, [
-    data.students,
-    data.matrix.rows,
-    activeQuestionIdSet,
-    activeQuestionIds,
-    processedResult,
-    probabilitiesByStudent,
-  ]);
+  }, [data.students, displayedMatrix]);
 
   const displayedSummary = useMemo(() => {
     const scores = displayedStudents.map((student) => student.scorePct);
-    const completion = displayedStudents.map((student) => student.completionPct);
     const sortedQuestions = [...displayedQuestions].sort(
       (left, right) => left.classCorrectPct - right.classCorrectPct,
     );
     const classAverage =
       scores.length > 0 ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0;
+    const meanScore = classAverage;
     const medianScore =
       scores.length > 0
         ? [...scores].sort((a, b) => a - b)[Math.floor(scores.length / 2)]
         : 0;
-    const completionRate =
-      completion.length > 0
-        ? completion.reduce((sum, value) => sum + value, 0) / completion.length
-        : 0;
-    const belowThresholdCount = displayedStudents.filter(
-      (student) => student.scorePct < data.settings.studentThresholdPct,
-    ).length;
+    const belowThresholdCount =
+      testedQuestionIds.length === 0
+        ? 0
+        : displayedStudents.filter((student) => student.scorePct < studentThresholdPct).length;
     const hardest = sortedQuestions[0] || null;
     const easiest = sortedQuestions[sortedQuestions.length - 1] || null;
 
     return {
       classAveragePct: classAverage,
+      meanScorePct: meanScore,
       medianScorePct: medianScore,
-      studentsBelowThresholdPct: pct(belowThresholdCount, displayedStudents.length),
-      completionRatePct: completionRate,
+      studentsBelowThresholdPct:
+        testedQuestionIds.length === 0 ? 0 : pct(belowThresholdCount, displayedStudents.length),
       hardestQuestion: hardest
         ? { questionId: hardest.questionId, classCorrectPct: hardest.classCorrectPct }
         : null,
@@ -227,7 +203,14 @@ export function DashboardClient({ data }: DashboardClientProps) {
         ? { questionId: easiest.questionId, classCorrectPct: easiest.classCorrectPct }
         : null,
     };
-  }, [displayedStudents, displayedQuestions, data.settings.studentThresholdPct]);
+  }, [displayedStudents, displayedQuestions, studentThresholdPct, testedQuestionIds.length]);
+
+  const belowThresholdValueClass =
+    displayedSummary.studentsBelowThresholdPct <= 20
+      ? "text-emerald-700"
+      : displayedSummary.studentsBelowThresholdPct <= 40
+        ? "text-amber-600"
+        : "text-rose-700";
 
   return (
     <>
@@ -241,8 +224,8 @@ export function DashboardClient({ data }: DashboardClientProps) {
           value={`${displayedSummary.medianScorePct.toFixed(2)}%`}
         />
         <StatCard
-          label="Students below threshold"
-          value={`${displayedSummary.studentsBelowThresholdPct.toFixed(2)}%`}
+          label="Mean score"
+          value={`${displayedSummary.meanScorePct.toFixed(2)}%`}
         />
         <StatCard
           label="Hardest question"
@@ -253,27 +236,71 @@ export function DashboardClient({ data }: DashboardClientProps) {
           value={formatQuestionRef(displayedSummary.easiestQuestion)}
         />
         <StatCard
-          label="Completion rate"
-          value={`${displayedSummary.completionRatePct.toFixed(2)}%`}
+          label="Students below threshold"
+          value={`${displayedSummary.studentsBelowThresholdPct.toFixed(2)}%`}
+          valueClassName={belowThresholdValueClass}
         />
       </section>
 
       <SectionCard
         title="Students Table"
-        subtitle={`Flag students below ${data.settings.studentThresholdPct.toFixed(0)}%`}
+        subtitle={
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-500">
+            Flag students below
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={studentThresholdPct}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isNaN(next)) {
+                  setStudentThresholdPct(0);
+                  return;
+                }
+                setStudentThresholdPct(Math.min(100, Math.max(0, next)));
+              }}
+              className="w-16 rounded-md border border-zinc-200 bg-white px-2 py-1 text-right text-sm text-zinc-900"
+              aria-label="Student threshold percent"
+            />
+            %
+          </label>
+        }
       >
         <StudentsTable students={displayedStudents} />
       </SectionCard>
 
       <SectionCard
         title="Question Analysis"
-        subtitle={`Flag questions below ${data.settings.questionThresholdPct.toFixed(0)}% class correct`}
+        subtitle={
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-500">
+            Flag questions below
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={questionThresholdPct}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isNaN(next)) {
+                  setQuestionThresholdPct(0);
+                  return;
+                }
+                setQuestionThresholdPct(Math.min(100, Math.max(0, next)));
+              }}
+              className="w-16 rounded-md border border-zinc-200 bg-white px-2 py-1 text-right text-sm text-zinc-900"
+              aria-label="Question threshold percent"
+            />
+            % class correct
+          </label>
+        }
       >
         <QuestionsTable
           questions={displayedQuestions}
-          questionThresholdPct={data.settings.questionThresholdPct}
           onProcessedSelection={(questionIds, result) => {
-            setActiveQuestionIds(questionIds);
+            setTestedQuestionIds(questionIds);
             setProcessedResult(result);
           }}
         />
