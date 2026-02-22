@@ -59,9 +59,22 @@ npm run dev
 
 The dashboard will be available at `http://localhost:3000`. The frontend expects the backend to be running --- configure a custom backend URL via the `BACKEND_API_URL` or `NEXT_PUBLIC_BACKEND_API_URL` environment variable if needed.
 
+### Running without training
+
+If you clone the repo and **do not** want to train the model (e.g. your machine is too slow), you can still run the web app using pre-trained weights:
+
+1. **Get the pre-trained weight files** from someone who has already run training, or from a shared drive. You need these 10 files placed in `students/student_weights/`:
+   - `student_1_memory_state.pt`, `student_1_model_with_memory.pt`
+   - `student_2_memory_state.pt`, `student_2_model_with_memory.pt`
+   - `student_3_memory_state.pt`, `student_3_model_with_memory.pt`
+   - `student_4_memory_state.pt`, `student_4_model_with_memory.pt`
+   - `student_5_memory_state.pt`, `student_5_model_with_memory.pt`
+
+2. The repo already includes `students/student_weights/summary.json` and the student CSVs (`student_1.csv` … `student_5.csv`). Once the `.pt` files above are in `students/student_weights/`, start the [backend](#backend) and [frontend](#frontend) as usual — no training or dataset is required.
+
 ### Model Training
 
-Training is only required if you want to retrain from scratch; pre-trained weights are included in `students/student_weights/`.
+Training is only required if you want to retrain from scratch; pre-trained weights are included in `students/student_weights/` when provided (see [Running without training](#running-without-training)).
 
 ```bash
 cd model-training

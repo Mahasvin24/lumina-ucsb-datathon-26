@@ -222,7 +222,11 @@ export function DashboardClient({ data }: DashboardClientProps) {
 
   const displayedSummary = useMemo(() => {
     const scores = displayedStudents.map((student) => student.scorePct);
-    const sortedQuestions = [...displayedQuestions].sort(
+    const questionsForSummary =
+      testedQuestionIds.length > 0
+        ? displayedQuestions.filter((q) => testedQuestionIdSet.has(q.questionId))
+        : displayedQuestions;
+    const sortedQuestions = [...questionsForSummary].sort(
       (left, right) => left.classCorrectPct - right.classCorrectPct,
     );
     const classAverage =
@@ -252,7 +256,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
         ? { questionId: easiest.questionId, classCorrectPct: easiest.classCorrectPct }
         : null,
     };
-  }, [displayedStudents, displayedQuestions, studentThresholdPct, testedQuestionIds.length]);
+  }, [displayedStudents, displayedQuestions, studentThresholdPct, testedQuestionIds.length, testedQuestionIdSet]);
 
   const mostMissedConcepts: ConceptAccuracy[] = useMemo(() => {
     const conceptCorrect = new Map<string, number>();

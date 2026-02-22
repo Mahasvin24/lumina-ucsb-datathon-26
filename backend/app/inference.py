@@ -59,6 +59,8 @@ def resolve_student_artifact(repo_root: Path, student_id: int) -> tuple[Path, di
     if not isinstance(artifact_raw, str) or not artifact_raw:
         raise HTTPException(status_code=500, detail="Student summary missing model_with_memory_path.")
     artifact_path = Path(artifact_raw)
+    if not artifact_path.is_absolute():
+        artifact_path = repo_root / artifact_path
     if not artifact_path.exists():
         raise HTTPException(status_code=404, detail=f"Model artifact missing: {artifact_path}")
     return artifact_path, selected
