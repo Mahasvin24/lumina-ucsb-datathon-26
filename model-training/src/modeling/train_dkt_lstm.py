@@ -54,50 +54,160 @@ def safe_auc(y_true: np.ndarray, y_prob: np.ndarray) -> float:
     return float(roc_auc_score(y_true, y_prob))
 
 
+def load_semantic_embedding_tables(path: Path) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray], int]:
+    if not path.exists():
+        return {}, {}, 0
+    payload = read_json(path)
+    semantic_dim = int(payload.get("projection_dim", 0))
+    content_payload = payload.get("qid2content_emb", {})
+    analysis_payload = payload.get("qid2analysis_emb", {})
+
+    content_embeddings: dict[int, np.ndarray] = {}
+    analysis_embeddings: dict[int, np.ndarray] = {}
+    if isinstance(content_payload, dict):
+        for key, value in content_payload.items():
+            if not isinstance(value, list):
+                continue
+            content_embeddings[int(key)] = np.asarray(value, dtype=np.float32)
+    if isinstance(analysis_payload, dict):
+        for key, value in analysis_payload.items():
+            if not isinstance(value, list):
+                continue
+            analysis_embeddings[int(key)] = np.asarray(value, dtype=np.float32)
+    if semantic_dim <= 0:
+        if content_embeddings:
+            semantic_dim = int(len(next(iter(content_embeddings.values()))))
+        elif analysis_embeddings:
+            semantic_dim = int(len(next(iter(analysis_embeddings.values()))))
+    return content_embeddings, analysis_embeddings, semantic_dim
+
+
 class DKTWindowDataset(Dataset):
-    def __init__(self, window_path: Path, num_questions: int) -> None:
+    def __init__(
+        self,
+        window_path: Path,
+        num_questions: int,
+        semantic_content_embeddings: dict[int, np.ndarray] | None = None,
+        semantic_analysis_embeddings: dict[int, np.ndarray] | None = None,
+        semantic_dim: int = 0,
+    ) -> None:
         self.num_questions = num_questions
-        rows = read_jsonl(window_path)
-        if not rows:
+        self.rows = read_jsonl(window_path)
+        if not self.rows:
             raise ValueError(f"No rows found in {window_path}")
 
-        interaction_ids: list[np.ndarray] = []
-        next_question_idx: list[np.ndarray] = []
-        targets: list[np.ndarray] = []
-        target_masks: list[np.ndarray] = []
+        max_concepts_per_timestep = 1
+        for row in self.rows:
+            seq_len = len(row["question_idx"])
+            concept_indices_raw = row.get("concept_indices", [[] for _ in range(seq_len)])
+            if len(concept_indices_raw) != seq_len:
+                concept_indices_raw = (concept_indices_raw[:seq_len]) + ([[]] * max(0, seq_len - len(concept_indices_raw)))
+            max_concepts_per_timestep = max(
+                max_concepts_per_timestep,
+                max((len(concepts) for concepts in concept_indices_raw), default=0),
+            )
+        self.max_concepts_per_timestep = max_concepts_per_timestep
 
-        for row in rows:
-            q = np.array(row["question_idx"], dtype=np.int64)
-            r = np.array(row["responses"], dtype=np.int64)
-            target = np.array(row["target_next_response"], dtype=np.float32)
-            mask = np.array(row["target_mask"], dtype=np.float32)
-            in_mask = np.array(row["input_mask"], dtype=np.int64)
+        self.semantic_dim = max(
+            int(semantic_dim),
+            len(next(iter(semantic_content_embeddings.values()))) if semantic_content_embeddings else 0,
+            len(next(iter(semantic_analysis_embeddings.values()))) if semantic_analysis_embeddings else 0,
+        )
+        max_qid = -1
+        if semantic_content_embeddings:
+            max_qid = max(max_qid, max(semantic_content_embeddings.keys()))
+        if semantic_analysis_embeddings:
+            max_qid = max(max_qid, max(semantic_analysis_embeddings.keys()))
+        lookup_size = max(0, max_qid + 1)
+        content_lookup = np.zeros((lookup_size, self.semantic_dim), dtype=np.float32)
+        analysis_lookup = np.zeros((lookup_size, self.semantic_dim), dtype=np.float32)
+        if semantic_content_embeddings:
+            for qid, vec in semantic_content_embeddings.items():
+                if 0 <= qid < lookup_size:
+                    content_lookup[qid] = vec[: self.semantic_dim]
+        if semantic_analysis_embeddings:
+            for qid, vec in semantic_analysis_embeddings.items():
+                if 0 <= qid < lookup_size:
+                    analysis_lookup[qid] = vec[: self.semantic_dim]
 
-            next_q = np.zeros_like(q)
-            next_q[:-1] = q[1:]
-
-            interaction = q + (r * self.num_questions)
-            interaction[in_mask == 0] = 0
-
-            interaction_ids.append(interaction)
-            next_question_idx.append(next_q)
-            targets.append(target)
-            target_masks.append(mask)
-
-        self.interaction_ids = torch.tensor(np.stack(interaction_ids), dtype=torch.long)
-        self.next_question_idx = torch.tensor(np.stack(next_question_idx), dtype=torch.long)
-        self.targets = torch.tensor(np.stack(targets), dtype=torch.float32)
-        self.target_masks = torch.tensor(np.stack(target_masks), dtype=torch.float32)
+        self.content_embedding_lookup = torch.tensor(content_lookup, dtype=torch.float32)
+        self.analysis_embedding_lookup = torch.tensor(analysis_lookup, dtype=torch.float32)
 
     def __len__(self) -> int:
-        return int(self.interaction_ids.shape[0])
+        return len(self.rows)
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+        row = self.rows[idx]
+        q = torch.tensor(row["question_idx"], dtype=torch.long)
+        seq_len = int(q.shape[0])
+        r = torch.tensor(row.get("responses", [0] * seq_len), dtype=torch.long)
+        in_mask = torch.tensor(row.get("input_mask", [1] * seq_len), dtype=torch.long)
+        interaction_ids = q + (r * self.num_questions)
+        interaction_ids[in_mask == 0] = 0
+        next_question_idx = torch.zeros_like(q)
+        next_question_idx[:-1] = q[1:]
+        targets = torch.tensor(row.get("target_next_response", [0.0] * seq_len), dtype=torch.float32)
+        target_masks = torch.tensor(row.get("target_mask", [0] * seq_len), dtype=torch.float32)
+
+        delta_t_log_bin = torch.tensor(row.get("delta_t_log_bin", [0] * seq_len), dtype=torch.long)
+        num_concepts = torch.tensor(row.get("num_concepts", [0] * seq_len), dtype=torch.float32)
+        concept_rarity_bucket = torch.tensor(row.get("concept_rarity_bucket", [0] * seq_len), dtype=torch.float32)
+        hist_accuracy = torch.tensor(row.get("hist_accuracy", [0.0] * seq_len), dtype=torch.float32)
+        question_difficulty_prior = torch.tensor(
+            row.get("question_difficulty_prior", [0.0] * seq_len),
+            dtype=torch.float32,
+        )
+        concept_difficulty_prior = torch.tensor(
+            row.get("concept_difficulty_prior", [0.0] * seq_len),
+            dtype=torch.float32,
+        )
+        question_type = torch.tensor(row.get("question_type", [-1] * seq_len), dtype=torch.long)
+        content_missing = torch.tensor(row.get("content_embedding_missing", [1] * seq_len), dtype=torch.float32)
+        analysis_missing = torch.tensor(row.get("analysis_embedding_missing", [1] * seq_len), dtype=torch.float32)
+        content_qid = torch.tensor(row.get("content_embedding_qid", [-1] * seq_len), dtype=torch.long)
+        analysis_qid = torch.tensor(row.get("analysis_embedding_qid", [-1] * seq_len), dtype=torch.long)
+
+        concept_indices_raw = row.get("concept_indices", [[] for _ in range(seq_len)])
+        if len(concept_indices_raw) != seq_len:
+            concept_indices_raw = (concept_indices_raw[:seq_len]) + ([[]] * max(0, seq_len - len(concept_indices_raw)))
+        concept_indices = torch.zeros((seq_len, self.max_concepts_per_timestep), dtype=torch.long)
+        concept_mask = torch.zeros((seq_len, self.max_concepts_per_timestep), dtype=torch.float32)
+        for ts_idx, concepts in enumerate(concept_indices_raw):
+            if not concepts:
+                continue
+            limit = min(self.max_concepts_per_timestep, len(concepts))
+            concept_indices[ts_idx, :limit] = torch.tensor(concepts[:limit], dtype=torch.long)
+            concept_mask[ts_idx, :limit] = 1.0
+
+        content_vec = torch.zeros((seq_len, self.semantic_dim), dtype=torch.float32)
+        analysis_vec = torch.zeros((seq_len, self.semantic_dim), dtype=torch.float32)
+        if self.content_embedding_lookup.shape[0] > 0 and self.semantic_dim > 0:
+            valid_content = (content_qid >= 0) & (content_qid < self.content_embedding_lookup.shape[0])
+            if valid_content.any():
+                content_vec[valid_content] = self.content_embedding_lookup[content_qid[valid_content]]
+        if self.analysis_embedding_lookup.shape[0] > 0 and self.semantic_dim > 0:
+            valid_analysis = (analysis_qid >= 0) & (analysis_qid < self.analysis_embedding_lookup.shape[0])
+            if valid_analysis.any():
+                analysis_vec[valid_analysis] = self.analysis_embedding_lookup[analysis_qid[valid_analysis]]
+
         return {
-            "interaction_ids": self.interaction_ids[idx],
-            "next_question_idx": self.next_question_idx[idx],
-            "targets": self.targets[idx],
-            "target_masks": self.target_masks[idx],
+            "interaction_ids": interaction_ids,
+            "next_question_idx": next_question_idx,
+            "targets": targets,
+            "target_masks": target_masks,
+            "delta_t_log_bin": delta_t_log_bin,
+            "num_concepts": num_concepts,
+            "concept_rarity_bucket": concept_rarity_bucket,
+            "hist_accuracy": hist_accuracy,
+            "question_difficulty_prior": question_difficulty_prior,
+            "concept_difficulty_prior": concept_difficulty_prior,
+            "question_type": question_type,
+            "content_embedding_missing": content_missing,
+            "analysis_embedding_missing": analysis_missing,
+            "content_vectors": content_vec,
+            "analysis_vectors": analysis_vec,
+            "concept_indices": concept_indices,
+            "concept_mask": concept_mask,
         }
 
 
@@ -105,17 +215,52 @@ class DKTLSTM(nn.Module):
     def __init__(
         self,
         num_questions: int,
+        concept_vocab_size: int,
         embedding_dim: int,
         hidden_size: int,
         num_layers: int,
         dropout: float,
+        concept_embedding_dim: int,
+        delta_t_embedding_dim: int,
+        question_type_embedding_dim: int,
+        numeric_projection_dim: int,
+        semantic_projection_dim: int,
+        semantic_vector_dim: int,
+        use_tags: bool,
+        use_semantic_vectors: bool,
+        use_numeric_features: bool,
     ) -> None:
         super().__init__()
         self.num_questions = num_questions
-        self.embedding = nn.Embedding(num_questions * 2, embedding_dim, padding_idx=0)
+        self.use_tags = use_tags
+        self.use_semantic_vectors = use_semantic_vectors
+        self.use_numeric_features = use_numeric_features
+        self.interaction_embedding = nn.Embedding(num_questions * 2, embedding_dim, padding_idx=0)
+
+        if self.use_tags:
+            self.concept_embedding = nn.Embedding(max(1, concept_vocab_size), concept_embedding_dim, padding_idx=0)
+
+        if self.use_numeric_features:
+            self.delta_t_embedding = nn.Embedding(21, delta_t_embedding_dim, padding_idx=0)
+            self.question_type_embedding = nn.Embedding(3, question_type_embedding_dim)
+            # num_concepts, concept_rarity_bucket, hist_accuracy, q_prior, c_prior, content_missing, analysis_missing
+            self.numeric_projection = nn.Linear(7, numeric_projection_dim)
+
+        if self.use_semantic_vectors:
+            semantic_input_dim = (semantic_vector_dim * 2) + 2
+            self.semantic_projection = nn.Linear(semantic_input_dim, semantic_projection_dim)
+
+        lstm_input_size = embedding_dim
+        if self.use_tags:
+            lstm_input_size += concept_embedding_dim
+        if self.use_numeric_features:
+            lstm_input_size += delta_t_embedding_dim + question_type_embedding_dim + numeric_projection_dim
+        if self.use_semantic_vectors:
+            lstm_input_size += semantic_projection_dim
+
         lstm_dropout = dropout if num_layers > 1 else 0.0
         self.lstm = nn.LSTM(
-            input_size=embedding_dim,
+            input_size=lstm_input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
@@ -124,8 +269,67 @@ class DKTLSTM(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.output = nn.Linear(hidden_size, num_questions)
 
-    def forward(self, interaction_ids: torch.Tensor) -> torch.Tensor:
-        x = self.embedding(interaction_ids)
+    def forward(
+        self,
+        interaction_ids: torch.Tensor,
+        concept_indices: torch.Tensor,
+        concept_mask: torch.Tensor,
+        delta_t_log_bin: torch.Tensor,
+        question_type: torch.Tensor,
+        num_concepts: torch.Tensor,
+        concept_rarity_bucket: torch.Tensor,
+        hist_accuracy: torch.Tensor,
+        question_difficulty_prior: torch.Tensor,
+        concept_difficulty_prior: torch.Tensor,
+        content_embedding_missing: torch.Tensor,
+        analysis_embedding_missing: torch.Tensor,
+        content_vectors: torch.Tensor,
+        analysis_vectors: torch.Tensor,
+    ) -> torch.Tensor:
+        x_parts: list[torch.Tensor] = [self.interaction_embedding(interaction_ids)]
+
+        if self.use_tags:
+            concept_emb = self.concept_embedding(concept_indices)
+            concept_mask_exp = concept_mask.unsqueeze(-1)
+            concept_sum = (concept_emb * concept_mask_exp).sum(dim=2)
+            concept_count = concept_mask_exp.sum(dim=2).clamp(min=1.0)
+            concept_pooled = concept_sum / concept_count
+            x_parts.append(concept_pooled)
+
+        if self.use_numeric_features:
+            delta_idx = delta_t_log_bin.clamp(min=0, max=20)
+            delta_emb = self.delta_t_embedding(delta_idx)
+            question_type_idx = (question_type + 1).clamp(min=0, max=2)
+            question_type_emb = self.question_type_embedding(question_type_idx)
+            numeric_raw = torch.stack(
+                [
+                    num_concepts,
+                    concept_rarity_bucket,
+                    hist_accuracy,
+                    question_difficulty_prior,
+                    concept_difficulty_prior,
+                    content_embedding_missing,
+                    analysis_embedding_missing,
+                ],
+                dim=-1,
+            )
+            numeric_proj = self.numeric_projection(numeric_raw)
+            x_parts.extend([delta_emb, question_type_emb, numeric_proj])
+
+        if self.use_semantic_vectors:
+            semantic_input = torch.cat(
+                [
+                    content_vectors,
+                    analysis_vectors,
+                    content_embedding_missing.unsqueeze(-1),
+                    analysis_embedding_missing.unsqueeze(-1),
+                ],
+                dim=-1,
+            )
+            semantic_proj = self.semantic_projection(semantic_input)
+            x_parts.append(semantic_proj)
+
+        x = torch.cat(x_parts, dim=-1)
         h, _ = self.lstm(x)
         h = self.dropout(h)
         return self.output(h)
@@ -173,8 +377,22 @@ def evaluate(
             next_question_idx = batch["next_question_idx"].to(device)
             targets = batch["targets"].to(device)
             masks = batch["target_masks"].to(device)
-
-            logits = model(interaction_ids)
+            logits = model(
+                interaction_ids=interaction_ids,
+                concept_indices=batch["concept_indices"].to(device),
+                concept_mask=batch["concept_mask"].to(device),
+                delta_t_log_bin=batch["delta_t_log_bin"].to(device),
+                question_type=batch["question_type"].to(device),
+                num_concepts=batch["num_concepts"].to(device),
+                concept_rarity_bucket=batch["concept_rarity_bucket"].to(device),
+                hist_accuracy=batch["hist_accuracy"].to(device),
+                question_difficulty_prior=batch["question_difficulty_prior"].to(device),
+                concept_difficulty_prior=batch["concept_difficulty_prior"].to(device),
+                content_embedding_missing=batch["content_embedding_missing"].to(device),
+                analysis_embedding_missing=batch["analysis_embedding_missing"].to(device),
+                content_vectors=batch["content_vectors"].to(device),
+                analysis_vectors=batch["analysis_vectors"].to(device),
+            )
             gathered_logits = gather_next_question_logits(logits, next_question_idx)
             loss = masked_bce_loss(gathered_logits, targets, masks, criterion)
 
@@ -265,13 +483,28 @@ def list_available_folds(data_dir: Path) -> list[int]:
     return folds
 
 
-def load_num_questions(fold_dir: Path) -> int:
-    feature_state = read_json(fold_dir / "feature_state.json")
-    return int(feature_state["question_vocab_size"])
+def load_feature_state(fold_dir: Path) -> dict[str, Any]:
+    return read_json(fold_dir / "feature_state.json")
 
 
-def build_loader(path: Path, num_questions: int, batch_size: int, num_workers: int, shuffle: bool) -> DataLoader:
-    dataset = DKTWindowDataset(path, num_questions=num_questions)
+def build_loader(
+    path: Path,
+    num_questions: int,
+    batch_size: int,
+    num_workers: int,
+    shuffle: bool,
+    semantic_tables_path: Path,
+    semantic_vector_dim: int,
+) -> DataLoader:
+    content_embeddings, analysis_embeddings, table_dim = load_semantic_embedding_tables(semantic_tables_path)
+    resolved_semantic_dim = semantic_vector_dim if semantic_vector_dim > 0 else table_dim
+    dataset = DKTWindowDataset(
+        path,
+        num_questions=num_questions,
+        semantic_content_embeddings=content_embeddings,
+        semantic_analysis_embeddings=analysis_embeddings,
+        semantic_dim=resolved_semantic_dim,
+    )
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
 
 
@@ -282,13 +515,18 @@ def train_fold(args: argparse.Namespace, fold_id: int, run_dir: Path, device: to
     if not train_path.exists() or not valid_path.exists():
         raise FileNotFoundError(f"Missing train/valid windows for fold_{fold_id} in {fold_dir}")
 
-    num_questions = load_num_questions(fold_dir)
+    feature_state = load_feature_state(fold_dir)
+    num_questions = int(feature_state["question_vocab_size"])
+    concept_vocab_size = int(feature_state.get("concept_vocab_size", 1))
+    semantic_tables_path = args.data_dir / "semantic_embedding_tables.json"
     train_loader = build_loader(
         train_path,
         num_questions=num_questions,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=True,
+        semantic_tables_path=semantic_tables_path,
+        semantic_vector_dim=args.semantic_vector_dim,
     )
     valid_loader = build_loader(
         valid_path,
@@ -296,14 +534,26 @@ def train_fold(args: argparse.Namespace, fold_id: int, run_dir: Path, device: to
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False,
+        semantic_tables_path=semantic_tables_path,
+        semantic_vector_dim=args.semantic_vector_dim,
     )
 
     model = DKTLSTM(
         num_questions=num_questions,
+        concept_vocab_size=concept_vocab_size,
         embedding_dim=args.embedding_dim,
         hidden_size=args.hidden_size,
         num_layers=args.num_layers,
         dropout=args.dropout,
+        concept_embedding_dim=args.concept_embedding_dim,
+        delta_t_embedding_dim=args.delta_t_embedding_dim,
+        question_type_embedding_dim=args.question_type_embedding_dim,
+        numeric_projection_dim=args.numeric_projection_dim,
+        semantic_projection_dim=args.semantic_projection_dim,
+        semantic_vector_dim=args.semantic_vector_dim,
+        use_tags=not args.disable_tags,
+        use_semantic_vectors=not args.disable_semantic_vectors,
+        use_numeric_features=not args.disable_numeric_features,
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.BCEWithLogitsLoss(reduction="none")
@@ -334,7 +584,22 @@ def train_fold(args: argparse.Namespace, fold_id: int, run_dir: Path, device: to
             targets = batch["targets"].to(device)
             masks = batch["target_masks"].to(device)
 
-            logits = model(interaction_ids)
+            logits = model(
+                interaction_ids=interaction_ids,
+                concept_indices=batch["concept_indices"].to(device),
+                concept_mask=batch["concept_mask"].to(device),
+                delta_t_log_bin=batch["delta_t_log_bin"].to(device),
+                question_type=batch["question_type"].to(device),
+                num_concepts=batch["num_concepts"].to(device),
+                concept_rarity_bucket=batch["concept_rarity_bucket"].to(device),
+                hist_accuracy=batch["hist_accuracy"].to(device),
+                question_difficulty_prior=batch["question_difficulty_prior"].to(device),
+                concept_difficulty_prior=batch["concept_difficulty_prior"].to(device),
+                content_embedding_missing=batch["content_embedding_missing"].to(device),
+                analysis_embedding_missing=batch["analysis_embedding_missing"].to(device),
+                content_vectors=batch["content_vectors"].to(device),
+                analysis_vectors=batch["analysis_vectors"].to(device),
+            )
             gathered_logits = gather_next_question_logits(logits, next_question_idx)
             loss = masked_bce_loss(gathered_logits, targets, masks, criterion)
             loss.backward()
@@ -372,6 +637,18 @@ def train_fold(args: argparse.Namespace, fold_id: int, run_dir: Path, device: to
                     "hidden_size": args.hidden_size,
                     "num_layers": args.num_layers,
                     "dropout": args.dropout,
+                    "concept_vocab_size": concept_vocab_size,
+                    "model_config": {
+                        "concept_embedding_dim": args.concept_embedding_dim,
+                        "delta_t_embedding_dim": args.delta_t_embedding_dim,
+                        "question_type_embedding_dim": args.question_type_embedding_dim,
+                        "numeric_projection_dim": args.numeric_projection_dim,
+                        "semantic_projection_dim": args.semantic_projection_dim,
+                        "semantic_vector_dim": args.semantic_vector_dim,
+                        "use_tags": not args.disable_tags,
+                        "use_semantic_vectors": not args.disable_semantic_vectors,
+                        "use_numeric_features": not args.disable_numeric_features,
+                    },
                     "best_epoch": epoch,
                 },
                 checkpoint_path,
@@ -435,20 +712,35 @@ def evaluate_fold(args: argparse.Namespace, fold_id: int, run_dir: Path, device:
 
     checkpoint = torch.load(ckpt_path, map_location=device)
     num_questions = int(checkpoint["num_questions"])
+    model_config = checkpoint.get("model_config", {})
+    semantic_tables_path = args.data_dir / "semantic_embedding_tables.json"
+    semantic_vector_dim = int(model_config.get("semantic_vector_dim", args.semantic_vector_dim))
     loader = build_loader(
         split_path,
         num_questions=num_questions,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False,
+        semantic_tables_path=semantic_tables_path,
+        semantic_vector_dim=semantic_vector_dim,
     )
 
     model = DKTLSTM(
         num_questions=num_questions,
+        concept_vocab_size=int(checkpoint.get("concept_vocab_size", 1)),
         embedding_dim=int(checkpoint["embedding_dim"]),
         hidden_size=int(checkpoint["hidden_size"]),
         num_layers=int(checkpoint["num_layers"]),
         dropout=float(checkpoint["dropout"]),
+        concept_embedding_dim=int(model_config.get("concept_embedding_dim", args.concept_embedding_dim)),
+        delta_t_embedding_dim=int(model_config.get("delta_t_embedding_dim", args.delta_t_embedding_dim)),
+        question_type_embedding_dim=int(model_config.get("question_type_embedding_dim", args.question_type_embedding_dim)),
+        numeric_projection_dim=int(model_config.get("numeric_projection_dim", args.numeric_projection_dim)),
+        semantic_projection_dim=int(model_config.get("semantic_projection_dim", args.semantic_projection_dim)),
+        semantic_vector_dim=semantic_vector_dim,
+        use_tags=bool(model_config.get("use_tags", False)),
+        use_semantic_vectors=bool(model_config.get("use_semantic_vectors", False)),
+        use_numeric_features=bool(model_config.get("use_numeric_features", False)),
     ).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
@@ -499,6 +791,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=0.0)
     parser.add_argument("--embedding-dim", type=int, default=64)
+    parser.add_argument("--concept-embedding-dim", type=int, default=32)
+    parser.add_argument("--delta-t-embedding-dim", type=int, default=8)
+    parser.add_argument("--question-type-embedding-dim", type=int, default=4)
+    parser.add_argument("--numeric-projection-dim", type=int, default=16)
+    parser.add_argument("--semantic-projection-dim", type=int, default=32)
+    parser.add_argument("--semantic-vector-dim", type=int, default=32)
+    parser.add_argument("--disable-tags", action="store_true")
+    parser.add_argument("--disable-semantic-vectors", action="store_true")
+    parser.add_argument("--disable-numeric-features", action="store_true")
     parser.add_argument("--hidden-size", type=int, default=128)
     parser.add_argument("--num-layers", type=int, default=1)
     parser.add_argument("--dropout", type=float, default=0.2)
