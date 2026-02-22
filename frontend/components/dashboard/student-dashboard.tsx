@@ -185,8 +185,7 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard
-          title="Weakest skills"
-          subtitle={<span className="text-sm text-zinc-500">Lowest predicted accuracy</span>}
+          title="Weakest Skills"
         >
           {predictedWeakest.length > 0 ? (
             <div className="space-y-2">
@@ -212,8 +211,7 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
         </SectionCard>
 
         <SectionCard
-          title="Strongest skills"
-          subtitle={<span className="text-sm text-zinc-500">Highest predicted accuracy</span>}
+          title="Strongest Skills"
         >
           {predictedStrongest.length > 0 ? (
             <div className="space-y-2">
@@ -239,14 +237,7 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
         </SectionCard>
       </div>
 
-      <SectionCard
-        title="Skill performance"
-        subtitle={
-          <span className="text-sm text-zinc-500">
-            Predicted accuracy by skill
-          </span>
-        }
-      >
+      <SectionCard title="Skill Performance">
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 8 }}>
@@ -270,7 +261,7 @@ export function StudentDashboard({ data }: StudentDashboardProps) {
         )}
       </SectionCard>
 
-      <SectionCard title="Question Breakdown" subtitle={<span className="text-sm text-zinc-500">Performance on each test question</span>}>
+      <SectionCard title="Question Breakdown">
         <Table className="min-w-full text-left">
           <TableHeader>
             <TableRow>

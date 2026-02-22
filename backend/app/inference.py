@@ -62,7 +62,12 @@ def resolve_student_artifact(repo_root: Path, student_id: int) -> tuple[Path, di
     if not artifact_path.is_absolute():
         artifact_path = repo_root / artifact_path
     if not artifact_path.exists():
-        raise HTTPException(status_code=404, detail=f"Model artifact missing: {artifact_path}")
+        # Fallback: resolve relative to repo (handles summary.json with paths from another machine)
+        fallback = repo_root / "students" / "student_weights" / Path(artifact_raw).name
+        if fallback.exists():
+            artifact_path = fallback
+        else:
+            raise HTTPException(status_code=404, detail=f"Model artifact missing: {artifact_path}")
     return artifact_path, selected
 
 

@@ -41,6 +41,8 @@ def _parse_concept_ids(raw: str) -> list[str]:
         return [part.strip() for part in value.split("|") if part.strip()]
     if "," in value:
         return [part.strip() for part in value.split(",") if part.strip()]
+    if "_" in value:
+        return [part.strip() for part in value.split("_") if part.strip()]
     return [value]
 
 
@@ -79,17 +81,19 @@ def _load_students(students_dir: Path) -> list[StudentData]:
 
         with csv_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.DictReader(handle)
-            required = {"question_id", "question_idx", "response", "timestamp", "concept_ids", "user_id"}
+            required = {"question_id", "response", "timestamp", "concept_ids", "user_id"}
             missing = sorted(required - set(reader.fieldnames or []))
             if missing:
                 raise ValueError(f"{csv_path.name} missing required columns: {missing}")
 
             for row in reader:
                 user_id = _safe_int(row.get("user_id"), user_id)
+                qid = _safe_int(row.get("question_id"))
+                qidx = _safe_int(row.get("question_idx"), qid)
                 attempts.append(
                     Attempt(
-                        question_id=_safe_int(row.get("question_id")),
-                        question_idx=_safe_int(row.get("question_idx")),
+                        question_id=qid,
+                        question_idx=qidx,
                         response=1 if _safe_int(row.get("response")) == 1 else 0,
                         timestamp=_safe_int(row.get("timestamp")),
                         concept_ids=_parse_concept_ids(str(row.get("concept_ids", ""))),
