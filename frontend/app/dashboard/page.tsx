@@ -1,23 +1,9 @@
-import { MatrixView } from "@/components/dashboard/matrix-view";
-import { QuestionsTable } from "@/components/dashboard/questions-table";
-import { RemediationPanel } from "@/components/dashboard/remediation-panel";
-import { SectionCard } from "@/components/dashboard/section-card";
-import { StatCard } from "@/components/dashboard/stat-card";
-import { StudentsTable } from "@/components/dashboard/students-table";
+import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import { DashboardPayload, getDashboardData } from "@/lib/dashboard-api";
 
 export const metadata = {
   title: "Test Set Dashboard",
 };
-
-function formatQuestionRef(
-  question: { questionId: number; classCorrectPct: number } | null,
-): string {
-  if (!question) {
-    return "N/A";
-  }
-  return `Q${question.questionId} (${question.classCorrectPct.toFixed(2)}%)`;
-}
 
 function DashboardErrorState({ message }: { message: string }) {
   return (
@@ -58,57 +44,7 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          label="Class average score"
-          value={`${data.summary.classAveragePct.toFixed(2)}%`}
-        />
-        <StatCard
-          label="Median score"
-          value={`${data.summary.medianScorePct.toFixed(2)}%`}
-        />
-        <StatCard
-          label="Students below threshold"
-          value={`${data.summary.studentsBelowThresholdPct.toFixed(2)}%`}
-        />
-        <StatCard
-          label="Hardest question"
-          value={formatQuestionRef(data.summary.hardestQuestion)}
-        />
-        <StatCard
-          label="Easiest question"
-          value={formatQuestionRef(data.summary.easiestQuestion)}
-        />
-        <StatCard
-          label="Completion rate"
-          value={`${data.summary.completionRatePct.toFixed(2)}%`}
-        />
-      </section>
-
-      <SectionCard
-        title="Students Table"
-        subtitle={`Flag students below ${data.settings.studentThresholdPct.toFixed(0)}%`}
-      >
-        <StudentsTable students={data.students} />
-      </SectionCard>
-
-      <SectionCard
-        title="Question Analysis"
-        subtitle={`Flag questions below ${data.settings.questionThresholdPct.toFixed(0)}% class correct`}
-      >
-        <QuestionsTable
-          questions={data.questions}
-          questionThresholdPct={data.settings.questionThresholdPct}
-        />
-      </SectionCard>
-
-      <SectionCard title="Student x Question Matrix">
-        <MatrixView questionIds={data.matrix.questionIds} rows={data.matrix.rows} />
-      </SectionCard>
-
-      <SectionCard title="Remediation Test-Set Builder">
-        <RemediationPanel data={data} />
-      </SectionCard>
+      <DashboardClient data={data} />
     </main>
   );
 }

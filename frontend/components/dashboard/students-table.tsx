@@ -15,7 +15,6 @@ export function StudentsTable({ students }: StudentsTableProps) {
             <th className="px-2 py-2 font-medium">Correct / Total</th>
             <th className="px-2 py-2 font-medium">Completion</th>
             <th className="px-2 py-2 font-medium">Status</th>
-            <th className="px-2 py-2 font-medium">Time Spent</th>
             <th className="px-2 py-2 font-medium">Most Missed Concept</th>
           </tr>
         </thead>
@@ -32,7 +31,6 @@ export function StudentsTable({ students }: StudentsTableProps) {
               </td>
               <td className="px-2 py-2">{student.completionPct.toFixed(2)}%</td>
               <td className="px-2 py-2">{student.status}</td>
-              <td className="px-2 py-2">{student.timeSpentMinutes.toFixed(1)} min</td>
               <td className="px-2 py-2">{student.mostMissedConcept}</td>
             </tr>
           ))}

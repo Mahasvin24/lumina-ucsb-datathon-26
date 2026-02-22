@@ -43,6 +43,7 @@ export type QuestionRow = {
 export type MatrixCell = {
   questionId: number;
   state: "correct" | "wrong" | "unanswered";
+  probability?: number;
 };
 
 export type MatrixRow = {
@@ -68,6 +69,35 @@ export type DashboardPayload = {
     skillCoverage: string[];
     previewQuestions: QuestionRow[];
   };
+};
+
+export type ProcessedQuestionSummary = {
+  question_id: number;
+  rows: number;
+  avg_probability: number;
+  used_fallback?: boolean;
+  used_concept_proxy?: boolean;
+};
+
+export type ProcessedStudentResult = {
+  student_id: number;
+  user_id: number;
+  processed_rows: number;
+  matched_rows?: number;
+  proxy_rows?: number;
+  question_summaries: ProcessedQuestionSummary[];
+};
+
+export type ProcessSelectedQuestionsError = {
+  student_id: number;
+  error: string;
+};
+
+export type ProcessSelectedQuestionsResponse = {
+  selected_question_ids: number[];
+  students: ProcessedStudentResult[];
+  total_processed_rows: number;
+  errors?: ProcessSelectedQuestionsError[];
 };
 
 type DashboardQuery = {
@@ -111,4 +141,20 @@ export async function getDashboardData(
     throw new Error(`Dashboard API failed (${response.status}): ${details}`);
   }
   return (await response.json()) as DashboardPayload;
+}
+
+export async function processSelectedQuestions(
+  questionIds: number[],
+): Promise<ProcessSelectedQuestionsResponse> {
+  const baseUrl = resolveBackendBaseUrl();
+  const response = await fetch(`${baseUrl}/process-selected-questions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question_ids: questionIds }),
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Process API failed (${response.status}): ${details}`);
+  }
+  return (await response.json()) as ProcessSelectedQuestionsResponse;
 }

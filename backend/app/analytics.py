@@ -11,6 +11,7 @@ from typing import Any
 @dataclass
 class Attempt:
     question_id: int
+    question_idx: int
     response: int
     timestamp: int
     concept_ids: list[str]
@@ -73,7 +74,7 @@ def _load_students(students_dir: Path) -> list[StudentData]:
 
         with csv_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.DictReader(handle)
-            required = {"question_id", "response", "timestamp", "concept_ids", "user_id"}
+            required = {"question_id", "question_idx", "response", "timestamp", "concept_ids", "user_id"}
             missing = sorted(required - set(reader.fieldnames or []))
             if missing:
                 raise ValueError(f"{csv_path.name} missing required columns: {missing}")
@@ -83,6 +84,7 @@ def _load_students(students_dir: Path) -> list[StudentData]:
                 attempts.append(
                     Attempt(
                         question_id=_safe_int(row.get("question_id")),
+                        question_idx=_safe_int(row.get("question_idx")),
                         response=1 if _safe_int(row.get("response")) == 1 else 0,
                         timestamp=_safe_int(row.get("timestamp")),
                         concept_ids=_parse_concept_ids(str(row.get("concept_ids", ""))),
@@ -100,11 +102,15 @@ def _latest_test_attempts(students: list[StudentData], test_question_ids: set[in
     for student in students:
         per_question: dict[int, Attempt] = {}
         for attempt in student.attempts:
-            if attempt.question_id not in test_question_ids:
+            if attempt.question_id in test_question_ids:
+                key = attempt.question_id
+            elif attempt.question_id <= 0 and attempt.question_idx in test_question_ids:
+                key = attempt.question_idx
+            else:
                 continue
-            prev = per_question.get(attempt.question_id)
+            prev = per_question.get(key)
             if prev is None or attempt.timestamp >= prev.timestamp:
-                per_question[attempt.question_id] = attempt
+                per_question[key] = attempt
         latest[student.student_id] = per_question
     return latest
 
